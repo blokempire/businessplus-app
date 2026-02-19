@@ -22,4 +22,5 @@
 - [x] Add CSV data export
 - [x] Generate custom app logo
 - [x] Update app.config.ts with branding
-- [ ] Prepare publishing guide document
+- [x] Prepare publishing guide document
+- [x] Rename app from 'Ledger' to 'Mon Business' in app.config.ts and login screen

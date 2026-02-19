@@ -42,7 +42,7 @@ export default function LoginScreen() {
           <View style={styles.logoContainer}>
             <IconSymbol name="dollarsign.circle" size={72} color="#FFFFFF" />
           </View>
-          <Text style={styles.appName}>Ledger</Text>
+          <Text style={styles.appName}>Mon Business</Text>
           <Text style={styles.tagline}>{translate("appDescription")}</Text>
         </View>
 
