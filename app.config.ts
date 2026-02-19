@@ -28,11 +28,11 @@ const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
   // App branding - update these values directly (do not use env vars)
-  appName: "Ledger - Smart Bookkeeping",
+  appName: "Ledger",
   appSlug: "ledger-app",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "",
+  logoUrl: "https://private-us-east-1.manuscdn.com/sessionFile/kj6FeRrVeRTJo2muKeszhm/sandbox/JxCIcTCi98fGkxKZPpUsHK-img-1_1771532838000_na1fn_bGVkZ2VyLWljb24.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUva2o2RmVSclZlUlRKbzJtdUtlc3pobS9zYW5kYm94L0p4Q0ljVENpOThmR2t4S1pQcFVzSEstaW1nLTFfMTc3MTUzMjgzODAwMF9uYTFmbl9iR1ZrWjJWeUxXbGpiMjQucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=XByM3njy4lFxN5NHTk43vHlLRyjDdAjfJ~owKJRExj9l3gRi1xWDtrUEb7gX4fEccUaLbFvNL3RFSmnm-DcMZOYELINufvMRLeJStGDpJWNXF7M~sbV1bHcIAYf67cxp6pI6W6UsEWdLlKXTDdomhTd78CMsMxTh5tThqR5J11cWTZjIuF2CM4tfNLGOdbqhSd3Ag-iqMGSngIhIuaG7aPuko8is7VNCHl0odJ33nEEJHpayl7NiffaRfzGq1-0pxHNi-fIJYoUxO28BPLN-UQ-TJ8sDGeQce8micBVY0D7Vpt75ygL8cUW4Iiphc3AOMmU6Yb0IFfHl2Gn~N-1lEA__",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
@@ -56,7 +56,7 @@ const config: ExpoConfig = {
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
+      backgroundColor: "#0D9488",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",

@@ -1,0 +1,25 @@
+# Project TODO
+
+- [x] Configure teal color theme in theme.config.js
+- [x] Set up tab navigation (Dashboard, Transactions, Reports, Settings)
+- [x] Add icon mappings for all tabs in icon-symbol.tsx
+- [x] Build Dashboard screen with balance card and quick actions
+- [x] Build Transactions list screen with filter bar
+- [x] Build Add/Edit Transaction modal screen
+- [x] Build Reports screen with period selector
+- [x] Build Settings screen
+- [x] Implement transaction data model and AsyncStorage persistence
+- [x] Implement category management (default + custom categories)
+- [x] Implement income/expense tracking with CRUD operations
+- [x] Implement balance calculation and summary
+- [x] Implement bar chart for income vs expense over time
+- [x] Implement pie chart for category breakdown (horizontal bar breakdown)
+- [x] Add French/English internationalization (i18n)
+- [x] Add language switcher in settings
+- [x] Implement user authentication (login via Manus OAuth)
+- [x] Implement multi-user support (OAuth-based, each user has own session)
+- [x] Add currency setting
+- [x] Add CSV data export
+- [x] Generate custom app logo
+- [x] Update app.config.ts with branding
+- [ ] Prepare publishing guide document
