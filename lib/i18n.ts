@@ -54,6 +54,9 @@ export const translations = {
     noDataForPeriod: "No data for this period",
     netBalance: "Net Balance",
 
+    // Form labels
+    type: "Type",
+
     // Settings
     profile: "Profile",
     language: "Language",
@@ -106,6 +109,37 @@ export const translations = {
     entertainment: "Entertainment",
     rent: "Rent",
     otherExpense: "Other Expense",
+
+    // Search
+    search: "Search",
+
+    // Contacts / Debt Book
+    contacts: "Contacts",
+    debtBook: "Debt Book",
+    addContact: "Add Contact",
+    editContact: "Edit Contact",
+    contactName: "Contact Name",
+    phoneNumber: "Phone Number",
+    note: "Note",
+    noContacts: "No contacts yet",
+    theyOweMe: "They Owe Me",
+    iOweThem: "I Owe Them",
+    addDebt: "Record Debt",
+    addCredit: "Record Credit",
+    debtHistory: "Transaction History",
+    settleAccount: "Settle Account",
+    settleConfirm: "This will consolidate all entries into a single balance. Continue?",
+    settled: "Account Settled",
+    totalOwedToYou: "Owed to You",
+    totalYouOwe: "You Owe",
+    deleteContact: "Delete Contact",
+    deleteContactConfirm: "This will delete the contact and all their debt records. Continue?",
+    enterContactName: "Enter contact name",
+    enterPhone: "Enter phone number (optional)",
+    enterNote: "Add a note (optional)",
+    noDebtEntries: "No entries yet",
+    settlementBalance: "Settlement balance carried forward",
+    accountSettled: "Account settled",
 
     // General
     today: "Today",
@@ -167,6 +201,9 @@ export const translations = {
     noDataForPeriod: "Aucune donnée pour cette période",
     netBalance: "Solde Net",
 
+    // Form labels
+    type: "Type",
+
     // Settings
     profile: "Profil",
     language: "Langue",
@@ -219,6 +256,37 @@ export const translations = {
     entertainment: "Divertissement",
     rent: "Loyer",
     otherExpense: "Autre dépense",
+
+    // Search
+    search: "Rechercher",
+
+    // Contacts / Debt Book
+    contacts: "Contacts",
+    debtBook: "Carnet de dettes",
+    addContact: "Ajouter un contact",
+    editContact: "Modifier le contact",
+    contactName: "Nom du contact",
+    phoneNumber: "Numéro de téléphone",
+    note: "Note",
+    noContacts: "Aucun contact",
+    theyOweMe: "Il me doit",
+    iOweThem: "Je lui dois",
+    addDebt: "Enregistrer une dette",
+    addCredit: "Enregistrer un crédit",
+    debtHistory: "Historique des transactions",
+    settleAccount: "Solder le compte",
+    settleConfirm: "Cela consolidera toutes les entrées en un seul solde. Continuer ?",
+    settled: "Compte soldé",
+    totalOwedToYou: "On vous doit",
+    totalYouOwe: "Vous devez",
+    deleteContact: "Supprimer le contact",
+    deleteContactConfirm: "Cela supprimera le contact et tous ses enregistrements de dette. Continuer ?",
+    enterContactName: "Entrer le nom du contact",
+    enterPhone: "Entrer le numéro (optionnel)",
+    enterNote: "Ajouter une note (optionnel)",
+    noDebtEntries: "Aucune entrée",
+    settlementBalance: "Solde de règlement reporté",
+    accountSettled: "Compte soldé",
 
     // General
     today: "Aujourd'hui",

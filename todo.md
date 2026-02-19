@@ -24,3 +24,13 @@
 - [x] Update app.config.ts with branding
 - [x] Prepare publishing guide document
 - [x] Rename app from 'Ledger' to 'Mon Business' in app.config.ts and login screen
+- [x] Add Contact and DebtEntry data models to store
+- [x] Add contact/debt storage functions (load, save, CRUD)
+- [x] Update AppContext with contacts state and actions
+- [x] Add Contacts tab to tab navigation with icon mapping
+- [x] Build Contacts list screen with per-person balances (green/red)
+- [x] Build Contact Detail screen with transaction history
+- [x] Build Add Debt/Credit modal for recording entries
+- [x] Add settle/close account feature
+- [x] Add i18n translations for all debt/contact strings (EN + FR)
+- [x] Write unit tests for contact/debt store functions

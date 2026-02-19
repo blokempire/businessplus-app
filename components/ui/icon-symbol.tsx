@@ -48,6 +48,11 @@ const MAPPING = {
   "banknote.fill": "payments",
   "building.2.fill": "business",
   "ellipsis": "more-horiz",
+  "person.2.fill": "people",
+  "person.crop.circle.badge.plus": "person-add",
+  "creditcard.fill": "credit-card",
+  "arrow.left.arrow.right": "swap-horiz",
+  "checkmark.circle.fill": "check-circle",
 } as IconMapping;
 
 export function IconSymbol({

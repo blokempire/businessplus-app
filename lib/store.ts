@@ -30,10 +30,32 @@ export interface UserProfile {
   language: Language;
 }
 
+export type DebtType = "theyOweMe" | "iOweThem";
+
+export interface DebtEntry {
+  id: string;
+  contactId: string;
+  type: DebtType;
+  amount: number;
+  description: string;
+  date: string; // ISO string
+  createdAt: string;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  note: string;
+  createdAt: string;
+}
+
 export interface AppState {
   transactions: Transaction[];
   categories: Category[];
   profile: UserProfile;
+  contacts: Contact[];
+  debtEntries: DebtEntry[];
 }
 
 // ─── Storage Keys ────────────────────────────────────────────────────
@@ -41,6 +63,8 @@ export interface AppState {
 const TRANSACTIONS_KEY = "@ledger_transactions";
 const CATEGORIES_KEY = "@ledger_categories";
 const PROFILE_KEY = "@ledger_profile";
+const CONTACTS_KEY = "@ledger_contacts";
+const DEBT_ENTRIES_KEY = "@ledger_debt_entries";
 
 // ─── Default Categories ─────────────────────────────────────────────
 
@@ -123,6 +147,32 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
 }
 
+export async function loadContacts(): Promise<Contact[]> {
+  try {
+    const data = await AsyncStorage.getItem(CONTACTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveContacts(contacts: Contact[]): Promise<void> {
+  await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
+}
+
+export async function loadDebtEntries(): Promise<DebtEntry[]> {
+  try {
+    const data = await AsyncStorage.getItem(DEBT_ENTRIES_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveDebtEntries(entries: DebtEntry[]): Promise<void> {
+  await AsyncStorage.setItem(DEBT_ENTRIES_KEY, JSON.stringify(entries));
+}
+
 // ─── Utility Functions ───────────────────────────────────────────────
 
 export function generateId(): string {
@@ -195,6 +245,21 @@ export function calculateTotals(transactions: Transaction[]): {
     else expense += tx.amount;
   }
   return { income, expense, balance: income - expense };
+}
+
+export function calculateContactBalance(entries: DebtEntry[], contactId: string): {
+  theyOweMe: number;
+  iOweThem: number;
+  netBalance: number;
+} {
+  let theyOweMe = 0;
+  let iOweThem = 0;
+  for (const entry of entries) {
+    if (entry.contactId !== contactId) continue;
+    if (entry.type === "theyOweMe") theyOweMe += entry.amount;
+    else iOweThem += entry.amount;
+  }
+  return { theyOweMe, iOweThem, netBalance: theyOweMe - iOweThem };
 }
 
 export const CURRENCIES = [
