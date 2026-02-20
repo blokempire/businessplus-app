@@ -53,6 +53,16 @@ const MAPPING = {
   "creditcard.fill": "credit-card",
   "arrow.left.arrow.right": "swap-horiz",
   "checkmark.circle.fill": "check-circle",
+  "shippingbox.fill": "inventory-2",
+  "doc.text.fill": "receipt",
+  "camera.fill": "camera-alt",
+  "photo.fill": "photo",
+  "square.and.arrow.up": "share",
+  "printer.fill": "print",
+  "plus": "add",
+  "minus": "remove",
+  "exclamationmark.triangle.fill": "warning",
+  "doc.richtext": "article",
 } as IconMapping;
 
 export function IconSymbol({

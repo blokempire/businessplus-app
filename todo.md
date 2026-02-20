@@ -40,3 +40,17 @@
 - [x] Add debt payment system (record partial/full payments against debts)
 - [x] Add payment history tracking per debt entry
 - [x] Write unit tests for payment features
+- [x] Add Product data model (name, price, quantity, unit, description, photo)
+- [x] Add Invoice data model (items, contact, totals, date, status, auto-debt)
+- [x] Add photo attachment support to transactions and invoices
+- [x] Build Stock/Inventory tab with product list and stock levels
+- [x] Build Add/Edit Product screen with photo capture
+- [x] Build Invoice creation screen linked to contacts and products
+- [x] Build Invoice detail/preview screen
+- [x] Auto-add invoice total to contact debt zone
+- [x] Build per-transaction detail view
+- [x] Add PDF export for individual transactions and invoices
+- [x] Add photo capture for receipts and documents (ImagePicker)
+- [x] Add i18n translations for stock, invoice, and PDF features (EN + FR)
+- [x] Add icon mappings for Stock tab
+- [x] Write unit tests for new features (39 passing)

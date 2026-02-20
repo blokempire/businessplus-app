@@ -80,7 +80,7 @@ export default function TransactionsScreen() {
 
   const renderTransaction = ({ item }: { item: Transaction }) => (
     <Pressable
-      onPress={() => handleEdit(item)}
+      onPress={() => router.push({ pathname: "/transaction-detail", params: { txId: item.id } } as any)}
       onLongPress={() => handleDelete(item.id)}
       style={({ pressed }) => [
         styles.transactionItem,

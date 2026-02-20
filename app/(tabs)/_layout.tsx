@@ -52,6 +52,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="stock"
+        options={{
+          title: translate("stock"),
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="shippingbox.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="invoices"
+        options={{
+          title: translate("invoices"),
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="doc.text.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="contacts"
         options={{
           title: translate("contacts"),

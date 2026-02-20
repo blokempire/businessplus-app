@@ -93,6 +93,10 @@ export default function RootLayout() {
             <Stack.Screen name="contact-detail" options={{ presentation: "card" }} />
             <Stack.Screen name="add-debt-entry" options={{ presentation: "modal" }} />
             <Stack.Screen name="login" options={{ presentation: "fullScreenModal" }} />
+            <Stack.Screen name="add-product" options={{ presentation: "modal" }} />
+            <Stack.Screen name="create-invoice" options={{ presentation: "modal" }} />
+            <Stack.Screen name="invoice-detail" options={{ presentation: "card" }} />
+            <Stack.Screen name="transaction-detail" options={{ presentation: "card" }} />
             <Stack.Screen name="oauth/callback" />
           </Stack>
           <StatusBar style="auto" />

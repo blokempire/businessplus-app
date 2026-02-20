@@ -6,6 +6,10 @@ import {
   Contact,
   DebtEntry,
   DebtType,
+  Product,
+  Invoice,
+  InvoiceItem,
+  InvoiceStatus,
   DEFAULT_PROFILE,
   DEFAULT_CATEGORIES,
   loadTransactions,
@@ -18,7 +22,12 @@ import {
   saveContacts,
   loadDebtEntries,
   saveDebtEntries,
+  loadProducts,
+  saveProducts,
+  loadInvoices,
+  saveInvoices,
   generateId,
+  generateInvoiceNumber,
   TransactionType,
 } from "./store";
 import { Language, getStoredLanguage, setStoredLanguage, t, TranslationKey } from "./i18n";
@@ -31,13 +40,15 @@ interface AppState {
   profile: UserProfile;
   contacts: Contact[];
   debtEntries: DebtEntry[];
+  products: Product[];
+  invoices: Invoice[];
   language: Language;
   isLoading: boolean;
 }
 
 type Action =
   | { type: "SET_LOADING"; payload: boolean }
-  | { type: "LOAD_DATA"; payload: { transactions: Transaction[]; categories: Category[]; profile: UserProfile; language: Language; contacts: Contact[]; debtEntries: DebtEntry[] } }
+  | { type: "LOAD_DATA"; payload: { transactions: Transaction[]; categories: Category[]; profile: UserProfile; language: Language; contacts: Contact[]; debtEntries: DebtEntry[]; products: Product[]; invoices: Invoice[] } }
   | { type: "ADD_TRANSACTION"; payload: Transaction }
   | { type: "UPDATE_TRANSACTION"; payload: Transaction }
   | { type: "DELETE_TRANSACTION"; payload: string }
@@ -50,68 +61,38 @@ type Action =
   | { type: "DELETE_CONTACT"; payload: string }
   | { type: "ADD_DEBT_ENTRY"; payload: DebtEntry }
   | { type: "DELETE_DEBT_ENTRY"; payload: string }
-  | { type: "SETTLE_CONTACT"; payload: { contactId: string; settlementEntry: DebtEntry } };
+  | { type: "SETTLE_CONTACT"; payload: { contactId: string; settlementEntry: DebtEntry } }
+  | { type: "ADD_PRODUCT"; payload: Product }
+  | { type: "UPDATE_PRODUCT"; payload: Product }
+  | { type: "DELETE_PRODUCT"; payload: string }
+  | { type: "ADD_INVOICE"; payload: Invoice }
+  | { type: "UPDATE_INVOICE"; payload: Invoice }
+  | { type: "DELETE_INVOICE"; payload: string };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
     case "LOAD_DATA":
-      return {
-        ...state,
-        ...action.payload,
-        isLoading: false,
-      };
+      return { ...state, ...action.payload, isLoading: false };
     case "ADD_TRANSACTION":
-      return {
-        ...state,
-        transactions: [action.payload, ...state.transactions],
-      };
+      return { ...state, transactions: [action.payload, ...state.transactions] };
     case "UPDATE_TRANSACTION":
-      return {
-        ...state,
-        transactions: state.transactions.map((tx) =>
-          tx.id === action.payload.id ? action.payload : tx
-        ),
-      };
+      return { ...state, transactions: state.transactions.map((tx) => tx.id === action.payload.id ? action.payload : tx) };
     case "DELETE_TRANSACTION":
-      return {
-        ...state,
-        transactions: state.transactions.filter((tx) => tx.id !== action.payload),
-      };
+      return { ...state, transactions: state.transactions.filter((tx) => tx.id !== action.payload) };
     case "ADD_CATEGORY":
-      return {
-        ...state,
-        categories: [...state.categories, action.payload],
-      };
+      return { ...state, categories: [...state.categories, action.payload] };
     case "DELETE_CATEGORY":
-      return {
-        ...state,
-        categories: state.categories.filter((c) => c.id !== action.payload),
-      };
+      return { ...state, categories: state.categories.filter((c) => c.id !== action.payload) };
     case "UPDATE_PROFILE":
-      return {
-        ...state,
-        profile: { ...state.profile, ...action.payload },
-      };
+      return { ...state, profile: { ...state.profile, ...action.payload } };
     case "SET_LANGUAGE":
-      return {
-        ...state,
-        language: action.payload,
-        profile: { ...state.profile, language: action.payload },
-      };
+      return { ...state, language: action.payload, profile: { ...state.profile, language: action.payload } };
     case "ADD_CONTACT":
-      return {
-        ...state,
-        contacts: [action.payload, ...state.contacts],
-      };
+      return { ...state, contacts: [action.payload, ...state.contacts] };
     case "UPDATE_CONTACT":
-      return {
-        ...state,
-        contacts: state.contacts.map((c) =>
-          c.id === action.payload.id ? action.payload : c
-        ),
-      };
+      return { ...state, contacts: state.contacts.map((c) => c.id === action.payload.id ? action.payload : c) };
     case "DELETE_CONTACT":
       return {
         ...state,
@@ -119,23 +100,25 @@ function reducer(state: AppState, action: Action): AppState {
         debtEntries: state.debtEntries.filter((e) => e.contactId !== action.payload),
       };
     case "ADD_DEBT_ENTRY":
-      return {
-        ...state,
-        debtEntries: [action.payload, ...state.debtEntries],
-      };
+      return { ...state, debtEntries: [action.payload, ...state.debtEntries] };
     case "DELETE_DEBT_ENTRY":
-      return {
-        ...state,
-        debtEntries: state.debtEntries.filter((e) => e.id !== action.payload),
-      };
+      return { ...state, debtEntries: state.debtEntries.filter((e) => e.id !== action.payload) };
     case "SETTLE_CONTACT": {
-      // Remove all entries for this contact and add a single settlement entry
       const filtered = state.debtEntries.filter((e) => e.contactId !== action.payload.contactId);
-      return {
-        ...state,
-        debtEntries: [action.payload.settlementEntry, ...filtered],
-      };
+      return { ...state, debtEntries: [action.payload.settlementEntry, ...filtered] };
     }
+    case "ADD_PRODUCT":
+      return { ...state, products: [action.payload, ...state.products] };
+    case "UPDATE_PRODUCT":
+      return { ...state, products: state.products.map((p) => p.id === action.payload.id ? action.payload : p) };
+    case "DELETE_PRODUCT":
+      return { ...state, products: state.products.filter((p) => p.id !== action.payload) };
+    case "ADD_INVOICE":
+      return { ...state, invoices: [action.payload, ...state.invoices] };
+    case "UPDATE_INVOICE":
+      return { ...state, invoices: state.invoices.map((inv) => inv.id === action.payload.id ? action.payload : inv) };
+    case "DELETE_INVOICE":
+      return { ...state, invoices: state.invoices.filter((inv) => inv.id !== action.payload) };
     default:
       return state;
   }
@@ -147,6 +130,8 @@ const initialState: AppState = {
   profile: DEFAULT_PROFILE,
   contacts: [],
   debtEntries: [],
+  products: [],
+  invoices: [],
   language: "en",
   isLoading: true,
 };
@@ -169,6 +154,12 @@ interface AppContextType {
   addDebtEntry: (contactId: string, type: DebtType, amount: number, description: string, date: string) => void;
   deleteDebtEntry: (id: string) => void;
   settleContact: (contactId: string) => void;
+  addProduct: (name: string, description: string, price: number, quantity: number, unit: string, photoUri: string) => Product;
+  updateProduct: (product: Product) => void;
+  deleteProduct: (id: string) => void;
+  addInvoice: (contactId: string, contactName: string, items: InvoiceItem[], tax: number, note: string, dueDate: string, photoUris: string[]) => Invoice;
+  updateInvoice: (invoice: Invoice) => void;
+  deleteInvoice: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -178,152 +169,75 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const [transactions, categories, profile, language, contacts, debtEntries] = await Promise.all([
+      const [transactions, categories, profile, language, contacts, debtEntries, products, invoices] = await Promise.all([
         loadTransactions(),
         loadCategories(),
         loadProfile(),
         getStoredLanguage(),
         loadContacts(),
         loadDebtEntries(),
+        loadProducts(),
+        loadInvoices(),
       ]);
       dispatch({
         type: "LOAD_DATA",
-        payload: { transactions, categories, profile: { ...profile, language }, language, contacts, debtEntries },
+        payload: { transactions, categories, profile: { ...profile, language }, language, contacts, debtEntries, products, invoices },
       });
     })();
   }, []);
 
-  // Persist transactions
-  useEffect(() => {
-    if (!state.isLoading) {
-      saveTransactions(state.transactions);
-    }
-  }, [state.transactions, state.isLoading]);
-
-  // Persist categories
-  useEffect(() => {
-    if (!state.isLoading) {
-      saveCategories(state.categories);
-    }
-  }, [state.categories, state.isLoading]);
-
-  // Persist profile
-  useEffect(() => {
-    if (!state.isLoading) {
-      saveProfile(state.profile);
-    }
-  }, [state.profile, state.isLoading]);
-
-  // Persist contacts
-  useEffect(() => {
-    if (!state.isLoading) {
-      saveContacts(state.contacts);
-    }
-  }, [state.contacts, state.isLoading]);
-
-  // Persist debt entries
-  useEffect(() => {
-    if (!state.isLoading) {
-      saveDebtEntries(state.debtEntries);
-    }
-  }, [state.debtEntries, state.isLoading]);
+  // Persist effects
+  useEffect(() => { if (!state.isLoading) saveTransactions(state.transactions); }, [state.transactions, state.isLoading]);
+  useEffect(() => { if (!state.isLoading) saveCategories(state.categories); }, [state.categories, state.isLoading]);
+  useEffect(() => { if (!state.isLoading) saveProfile(state.profile); }, [state.profile, state.isLoading]);
+  useEffect(() => { if (!state.isLoading) saveContacts(state.contacts); }, [state.contacts, state.isLoading]);
+  useEffect(() => { if (!state.isLoading) saveDebtEntries(state.debtEntries); }, [state.debtEntries, state.isLoading]);
+  useEffect(() => { if (!state.isLoading) saveProducts(state.products); }, [state.products, state.isLoading]);
+  useEffect(() => { if (!state.isLoading) saveInvoices(state.invoices); }, [state.invoices, state.isLoading]);
 
   const addTransaction = useCallback(
     (type: TransactionType, amount: number, categoryId: string, description: string, date: string) => {
-      const tx: Transaction = {
-        id: generateId(),
-        type,
-        amount,
-        categoryId,
-        description,
-        date,
-        createdAt: new Date().toISOString(),
-      };
+      const tx: Transaction = { id: generateId(), type, amount, categoryId, description, date, createdAt: new Date().toISOString() };
       dispatch({ type: "ADD_TRANSACTION", payload: tx });
-    },
-    []
-  );
+    }, []);
 
-  const updateTransaction = useCallback((tx: Transaction) => {
-    dispatch({ type: "UPDATE_TRANSACTION", payload: tx });
-  }, []);
-
-  const deleteTransaction = useCallback((id: string) => {
-    dispatch({ type: "DELETE_TRANSACTION", payload: id });
-  }, []);
+  const updateTransaction = useCallback((tx: Transaction) => { dispatch({ type: "UPDATE_TRANSACTION", payload: tx }); }, []);
+  const deleteTransaction = useCallback((id: string) => { dispatch({ type: "DELETE_TRANSACTION", payload: id }); }, []);
 
   const addCategory = useCallback((nameKey: string, icon: string, type: TransactionType) => {
-    const cat: Category = {
-      id: generateId(),
-      nameKey,
-      icon,
-      type,
-      isCustom: true,
-    };
+    const cat: Category = { id: generateId(), nameKey, icon, type, isCustom: true };
     dispatch({ type: "ADD_CATEGORY", payload: cat });
   }, []);
 
-  const deleteCategory = useCallback((id: string) => {
-    dispatch({ type: "DELETE_CATEGORY", payload: id });
-  }, []);
-
-  const updateProfile = useCallback((updates: Partial<UserProfile>) => {
-    dispatch({ type: "UPDATE_PROFILE", payload: updates });
-  }, []);
+  const deleteCategory = useCallback((id: string) => { dispatch({ type: "DELETE_CATEGORY", payload: id }); }, []);
+  const updateProfile = useCallback((updates: Partial<UserProfile>) => { dispatch({ type: "UPDATE_PROFILE", payload: updates }); }, []);
 
   const setLanguage = useCallback((lang: Language) => {
     setStoredLanguage(lang);
     dispatch({ type: "SET_LANGUAGE", payload: lang });
   }, []);
 
-  const translate = useCallback(
-    (key: TranslationKey) => t(key, state.language),
-    [state.language]
-  );
+  const translate = useCallback((key: TranslationKey) => t(key, state.language), [state.language]);
 
   const addContact = useCallback((name: string, phone: string, note: string): Contact => {
-    const contact: Contact = {
-      id: generateId(),
-      name,
-      phone,
-      note,
-      createdAt: new Date().toISOString(),
-    };
+    const contact: Contact = { id: generateId(), name, phone, note, createdAt: new Date().toISOString() };
     dispatch({ type: "ADD_CONTACT", payload: contact });
     return contact;
   }, []);
 
-  const updateContact = useCallback((contact: Contact) => {
-    dispatch({ type: "UPDATE_CONTACT", payload: contact });
-  }, []);
-
-  const deleteContact = useCallback((id: string) => {
-    dispatch({ type: "DELETE_CONTACT", payload: id });
-  }, []);
+  const updateContact = useCallback((contact: Contact) => { dispatch({ type: "UPDATE_CONTACT", payload: contact }); }, []);
+  const deleteContact = useCallback((id: string) => { dispatch({ type: "DELETE_CONTACT", payload: id }); }, []);
 
   const addDebtEntry = useCallback(
     (contactId: string, type: DebtType, amount: number, description: string, date: string) => {
-      const entry: DebtEntry = {
-        id: generateId(),
-        contactId,
-        type,
-        amount,
-        description,
-        date,
-        createdAt: new Date().toISOString(),
-      };
+      const entry: DebtEntry = { id: generateId(), contactId, type, amount, description, date, createdAt: new Date().toISOString() };
       dispatch({ type: "ADD_DEBT_ENTRY", payload: entry });
-    },
-    []
-  );
+    }, []);
 
-  const deleteDebtEntry = useCallback((id: string) => {
-    dispatch({ type: "DELETE_DEBT_ENTRY", payload: id });
-  }, []);
+  const deleteDebtEntry = useCallback((id: string) => { dispatch({ type: "DELETE_DEBT_ENTRY", payload: id }); }, []);
 
   const settleContact = useCallback(
     (contactId: string) => {
-      // Calculate net balance and create a single settlement entry
       let theyOweMe = 0;
       let iOweThem = 0;
       for (const entry of state.debtEntries) {
@@ -333,56 +247,97 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       const net = theyOweMe - iOweThem;
       if (net === 0) {
-        // Just clear all entries
         dispatch({
           type: "SETTLE_CONTACT",
           payload: {
             contactId,
-            settlementEntry: {
-              id: generateId(),
-              contactId,
-              type: "theyOweMe",
-              amount: 0,
-              description: "Account settled",
-              date: new Date().toISOString(),
-              createdAt: new Date().toISOString(),
-            },
+            settlementEntry: { id: generateId(), contactId, type: "theyOweMe", amount: 0, description: "Account settled", date: new Date().toISOString(), createdAt: new Date().toISOString() },
           },
         });
         return;
       }
       const settlementEntry: DebtEntry = {
+        id: generateId(), contactId, type: net > 0 ? "theyOweMe" : "iOweThem", amount: Math.abs(net),
+        description: "Settlement balance carried forward", date: new Date().toISOString(), createdAt: new Date().toISOString(),
+      };
+      dispatch({ type: "SETTLE_CONTACT", payload: { contactId, settlementEntry } });
+    }, [state.debtEntries]);
+
+  // ─── Product Actions ──────────────────────────────────────────────
+
+  const addProduct = useCallback(
+    (name: string, description: string, price: number, quantity: number, unit: string, photoUri: string): Product => {
+      const product: Product = { id: generateId(), name, description, price, quantity, unit, photoUri, createdAt: new Date().toISOString() };
+      dispatch({ type: "ADD_PRODUCT", payload: product });
+      return product;
+    }, []);
+
+  const updateProduct = useCallback((product: Product) => { dispatch({ type: "UPDATE_PRODUCT", payload: product }); }, []);
+  const deleteProduct = useCallback((id: string) => { dispatch({ type: "DELETE_PRODUCT", payload: id }); }, []);
+
+  // ─── Invoice Actions ──────────────────────────────────────────────
+
+  const addInvoice = useCallback(
+    (contactId: string, contactName: string, items: InvoiceItem[], tax: number, note: string, dueDate: string, photoUris: string[]): Invoice => {
+      const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+      const total = subtotal + tax;
+      const invoice: Invoice = {
+        id: generateId(),
+        invoiceNumber: generateInvoiceNumber(state.invoices),
+        contactId,
+        contactName,
+        items,
+        subtotal,
+        tax,
+        total,
+        status: "pending",
+        paidAmount: 0,
+        date: new Date().toISOString(),
+        dueDate,
+        note,
+        photoUris,
+        createdAt: new Date().toISOString(),
+      };
+      dispatch({ type: "ADD_INVOICE", payload: invoice });
+
+      // Auto-add to debt zone: the contact owes this invoice total
+      const debtEntry: DebtEntry = {
         id: generateId(),
         contactId,
-        type: net > 0 ? "theyOweMe" : "iOweThem",
-        amount: Math.abs(net),
-        description: "Settlement balance carried forward",
+        type: "theyOweMe",
+        amount: total,
+        description: `Invoice ${invoice.invoiceNumber}`,
         date: new Date().toISOString(),
         createdAt: new Date().toISOString(),
       };
-      dispatch({ type: "SETTLE_CONTACT", payload: { contactId, settlementEntry } });
-    },
-    [state.debtEntries]
-  );
+      dispatch({ type: "ADD_DEBT_ENTRY", payload: debtEntry });
+
+      // Deduct stock for each item
+      for (const item of items) {
+        const product = state.products.find((p) => p.id === item.productId);
+        if (product) {
+          const updatedProduct = { ...product, quantity: Math.max(0, product.quantity - item.quantity) };
+          dispatch({ type: "UPDATE_PRODUCT", payload: updatedProduct });
+        }
+      }
+
+      return invoice;
+    }, [state.invoices, state.products]);
+
+  const updateInvoice = useCallback((invoice: Invoice) => { dispatch({ type: "UPDATE_INVOICE", payload: invoice }); }, []);
+  const deleteInvoice = useCallback((id: string) => { dispatch({ type: "DELETE_INVOICE", payload: id }); }, []);
 
   return (
     <AppContext.Provider
       value={{
         state,
-        addTransaction,
-        updateTransaction,
-        deleteTransaction,
-        addCategory,
-        deleteCategory,
-        updateProfile,
-        setLanguage,
-        translate,
-        addContact,
-        updateContact,
-        deleteContact,
-        addDebtEntry,
-        deleteDebtEntry,
-        settleContact,
+        addTransaction, updateTransaction, deleteTransaction,
+        addCategory, deleteCategory,
+        updateProfile, setLanguage, translate,
+        addContact, updateContact, deleteContact,
+        addDebtEntry, deleteDebtEntry, settleContact,
+        addProduct, updateProduct, deleteProduct,
+        addInvoice, updateInvoice, deleteInvoice,
       }}
     >
       {children}

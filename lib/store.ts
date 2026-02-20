@@ -50,12 +50,53 @@ export interface Contact {
   createdAt: string;
 }
 
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  quantity: number;
+  unit: string; // e.g., "pcs", "kg", "L"
+  photoUri: string; // local URI or empty
+  createdAt: string;
+}
+
+export interface InvoiceItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export type InvoiceStatus = "pending" | "paid" | "partial";
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  contactId: string;
+  contactName: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: InvoiceStatus;
+  paidAmount: number;
+  date: string;
+  dueDate: string;
+  note: string;
+  photoUris: string[]; // attached receipt/document photos
+  createdAt: string;
+}
+
 export interface AppState {
   transactions: Transaction[];
   categories: Category[];
   profile: UserProfile;
   contacts: Contact[];
   debtEntries: DebtEntry[];
+  products: Product[];
+  invoices: Invoice[];
 }
 
 // ─── Storage Keys ────────────────────────────────────────────────────
@@ -65,6 +106,8 @@ const CATEGORIES_KEY = "@ledger_categories";
 const PROFILE_KEY = "@ledger_profile";
 const CONTACTS_KEY = "@ledger_contacts";
 const DEBT_ENTRIES_KEY = "@ledger_debt_entries";
+const PRODUCTS_KEY = "@ledger_products";
+const INVOICES_KEY = "@ledger_invoices";
 
 // ─── Default Categories ─────────────────────────────────────────────
 
@@ -171,6 +214,39 @@ export async function loadDebtEntries(): Promise<DebtEntry[]> {
 
 export async function saveDebtEntries(entries: DebtEntry[]): Promise<void> {
   await AsyncStorage.setItem(DEBT_ENTRIES_KEY, JSON.stringify(entries));
+}
+
+export async function loadProducts(): Promise<Product[]> {
+  try {
+    const data = await AsyncStorage.getItem(PRODUCTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveProducts(products: Product[]): Promise<void> {
+  await AsyncStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+}
+
+export async function loadInvoices(): Promise<Invoice[]> {
+  try {
+    const data = await AsyncStorage.getItem(INVOICES_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveInvoices(invoices: Invoice[]): Promise<void> {
+  await AsyncStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+}
+
+export function generateInvoiceNumber(existingInvoices: Invoice[]): string {
+  const now = new Date();
+  const prefix = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const count = existingInvoices.filter((inv) => inv.invoiceNumber.startsWith(prefix)).length;
+  return `${prefix}-${String(count + 1).padStart(3, "0")}`;
 }
 
 // ─── Utility Functions ───────────────────────────────────────────────
