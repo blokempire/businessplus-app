@@ -141,6 +141,28 @@ export const translations = {
     settlementBalance: "Settlement balance carried forward",
     accountSettled: "Account settled",
 
+    // Reminders
+    sendReminder: "Send Reminder",
+    sendViaSMS: "Send via SMS",
+    sendViaWhatsApp: "Send via WhatsApp",
+    reminderMessage: "Hi {name}, this is a friendly reminder that you have an outstanding balance of {amount}. Please arrange payment at your earliest convenience. Thank you!",
+    smsNotAvailable: "SMS is not available on this device",
+    whatsAppNotAvailable: "WhatsApp is not available on this device",
+    noPhoneNumber: "No phone number for this contact. Please add one first.",
+
+    // Payments
+    recordPayment: "Record Payment",
+    paymentAmount: "Payment Amount",
+    paymentReceived: "Payment Received",
+    paymentMade: "Payment Made",
+    payFull: "Pay Full Amount",
+    payPartial: "Pay Partial Amount",
+    enterPaymentAmount: "Enter payment amount",
+    paymentExceedsDebt: "Payment amount exceeds the outstanding balance",
+    paymentRecorded: "Payment recorded successfully",
+    remainingBalance: "Remaining Balance",
+    paid: "Paid",
+
     // General
     today: "Today",
     yesterday: "Yesterday",
@@ -287,6 +309,28 @@ export const translations = {
     noDebtEntries: "Aucune entrée",
     settlementBalance: "Solde de règlement reporté",
     accountSettled: "Compte soldé",
+
+    // Reminders
+    sendReminder: "Envoyer un rappel",
+    sendViaSMS: "Envoyer par SMS",
+    sendViaWhatsApp: "Envoyer par WhatsApp",
+    reminderMessage: "Bonjour {name}, ceci est un rappel amical que vous avez un solde impayé de {amount}. Merci de bien vouloir effectuer le paiement dès que possible. Merci !",
+    smsNotAvailable: "Le SMS n'est pas disponible sur cet appareil",
+    whatsAppNotAvailable: "WhatsApp n'est pas disponible sur cet appareil",
+    noPhoneNumber: "Aucun numéro de téléphone pour ce contact. Veuillez en ajouter un d'abord.",
+
+    // Payments
+    recordPayment: "Enregistrer un paiement",
+    paymentAmount: "Montant du paiement",
+    paymentReceived: "Paiement reçu",
+    paymentMade: "Paiement effectué",
+    payFull: "Payer le montant total",
+    payPartial: "Paiement partiel",
+    enterPaymentAmount: "Entrer le montant du paiement",
+    paymentExceedsDebt: "Le montant du paiement dépasse le solde impayé",
+    paymentRecorded: "Paiement enregistré avec succès",
+    remainingBalance: "Solde restant",
+    paid: "Payé",
 
     // General
     today: "Aujourd'hui",

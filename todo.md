@@ -34,3 +34,9 @@
 - [x] Add settle/close account feature
 - [x] Add i18n translations for all debt/contact strings (EN + FR)
 - [x] Write unit tests for contact/debt store functions
+- [x] Add SMS reminder button on Contact Detail screen
+- [x] Add WhatsApp reminder button on Contact Detail screen
+- [x] Add i18n translations for reminder and payment features (EN + FR)
+- [x] Add debt payment system (record partial/full payments against debts)
+- [x] Add payment history tracking per debt entry
+- [x] Write unit tests for payment features
