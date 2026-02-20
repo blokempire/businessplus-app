@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View, TextInput, TouchableOpacity, ScrollView, Alert, FlatList } from "react-native";
+import { Text, View, TextInput, TouchableOpacity, ScrollView, Alert, FlatList, KeyboardAvoidingView, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -186,7 +186,12 @@ export default function CreateInvoiceScreen() {
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-4 pt-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <TouchableOpacity onPress={() => router.back()}>
@@ -309,6 +314,7 @@ export default function CreateInvoiceScreen() {
           <Text style={{ color: colors.background, fontSize: 16, fontWeight: "600" }}>{translate("createInvoice")}</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }

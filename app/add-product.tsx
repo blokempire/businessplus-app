@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Text, View, TextInput, TouchableOpacity, ScrollView, Alert, Platform } from "react-native";
+import { Text, View, TextInput, TouchableOpacity, ScrollView, Alert, Platform, KeyboardAvoidingView } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -95,7 +95,12 @@ export default function AddProductScreen() {
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-4 pt-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <TouchableOpacity onPress={() => router.back()}>
@@ -210,6 +215,7 @@ export default function AddProductScreen() {
           <Text style={{ color: colors.background, fontSize: 16, fontWeight: "600" }}>{translate("save")}</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }

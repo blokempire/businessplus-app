@@ -54,3 +54,26 @@
 - [x] Add i18n translations for stock, invoice, and PDF features (EN + FR)
 - [x] Add icon mappings for Stock tab
 - [x] Write unit tests for new features (39 passing)
+- [x] Fix "Soldé le compte" — clear all debts instead of consolidating
+- [x] Fix settle account: record remaining balance (sold) as income/expense transaction before clearing debts
+- [x] Fix footer tab bar icons — reduced to 5 visible tabs, Reports/Settings accessible from Dashboard
+- [x] Contact Detail — collapse profile header on scroll for more content space
+- [ ] Invoice status auto-debt — unpaid invoices automatically become debts
+- [ ] Transactions export by date range (PDF/CSV)
+- [ ] Stock/inventory export (PDF/CSV)
+- [x] Contact records/debt history export (PDF/CSV)
+- [x] Add company logo upload in Settings (pick from gallery or camera)
+- [x] Display company logo on Dashboard header
+- [x] Add logoUri to UserProfile and persist in AsyncStorage
+- [x] Add KeyboardAvoidingView to all input screens so keyboard pushes content up
+- [x] Add admin role to user database schema (added status field: active/restricted)
+- [x] Create server API endpoints for admin user management (list users, grant/restrict access, set roles)
+- [x] Build Admin Panel screen (visible only to admins)
+- [x] Add user list with status indicators (active/restricted)
+- [x] Add grant/restrict access toggle per user
+- [x] Add admin role assignment capability
+- [x] Add user activity/stats overview in admin panel
+- [x] Add admin panel navigation (hidden from non-admin users, visible on Dashboard for admins)
+- [x] Add date-range transaction export (CSV/PDF)
+- [x] Add stock/inventory export (CSV/PDF)
+- [x] Fix invoice auto-debt: unpaid invoices automatically create debt entries (already implemented)

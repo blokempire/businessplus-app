@@ -6,6 +6,8 @@ import {
   Pressable,
   StyleSheet,
   Alert,
+  Modal,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -13,14 +15,19 @@ import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { formatCurrency, Transaction, TransactionType } from "@/lib/store";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 
 type FilterType = "all" | "income" | "expense";
+type DateRange = "all" | "today" | "week" | "month" | "year";
 
 export default function TransactionsScreen() {
   const { state, deleteTransaction, translate } = useApp();
   const colors = useColors();
   const router = useRouter();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [exportMenuVisible, setExportMenuVisible] = useState(false);
 
   const filteredTransactions = useMemo(() => {
     let txs = [...state.transactions].sort(
@@ -29,8 +36,23 @@ export default function TransactionsScreen() {
     if (filter !== "all") {
       txs = txs.filter((tx) => tx.type === filter);
     }
+    // Date range filter
+    if (dateRange !== "all") {
+      const now = new Date();
+      const start = new Date();
+      if (dateRange === "today") {
+        start.setHours(0, 0, 0, 0);
+      } else if (dateRange === "week") {
+        start.setDate(now.getDate() - 7);
+      } else if (dateRange === "month") {
+        start.setMonth(now.getMonth() - 1);
+      } else if (dateRange === "year") {
+        start.setFullYear(now.getFullYear() - 1);
+      }
+      txs = txs.filter((tx) => new Date(tx.date) >= start);
+    }
     return txs;
-  }, [state.transactions, filter]);
+  }, [state.transactions, filter, dateRange]);
 
   const getCategoryName = useCallback(
     (categoryId: string) => {
@@ -74,8 +96,129 @@ export default function TransactionsScreen() {
     );
   };
 
-  const handleEdit = (tx: Transaction) => {
-    router.push(`/add-transaction?editId=${tx.id}` as any);
+  const totals = useMemo(() => {
+    const income = filteredTransactions
+      .filter((tx) => tx.type === "income")
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    const expense = filteredTransactions
+      .filter((tx) => tx.type === "expense")
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    return { income, expense, balance: income - expense };
+  }, [filteredTransactions]);
+
+  const exportAsCSV = async () => {
+    setExportMenuVisible(false);
+    const header = "Date,Type,Category,Description,Amount\n";
+    const rows = filteredTransactions
+      .map(
+        (tx) =>
+          `${tx.date},${tx.type},${getCategoryName(tx.categoryId)},"${tx.description || ""}",${tx.type === "income" ? "+" : "-"}${tx.amount}`
+      )
+      .join("\n");
+    const summary = `\n\n${translate("totalIncome")},${totals.income}\n${translate("totalExpense")},${totals.expense}\n${translate("totalBalance")},${totals.balance}`;
+    const csv = header + rows + summary;
+
+    if (Platform.OS === "web") {
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `transactions_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      try {
+        const { uri } = await Print.printToFileAsync({
+          html: `<pre>${csv}</pre>`,
+        });
+        await Sharing.shareAsync(uri);
+      } catch (e) {
+        Alert.alert(translate("error"), String(e));
+      }
+    }
+  };
+
+  const exportAsPDF = async () => {
+    setExportMenuVisible(false);
+    const businessName = state.profile.businessName || "Mon Business";
+    const dateLabel = dateRange === "all" ? translate("all") : translate(dateRange as any);
+    const html = `
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 30px; color: #333; }
+          h1 { color: #0D9488; margin-bottom: 4px; }
+          .subtitle { color: #666; margin-bottom: 20px; }
+          .summary { display: flex; gap: 20px; margin-bottom: 24px; }
+          .summary-box { flex: 1; padding: 16px; border-radius: 10px; text-align: center; }
+          .income-box { background: #ECFDF5; }
+          .expense-box { background: #FEF2F2; }
+          .balance-box { background: #F0FDFA; }
+          .summary-label { font-size: 12px; color: #666; }
+          .summary-value { font-size: 20px; font-weight: bold; margin-top: 4px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+          th { background: #0D9488; color: white; padding: 10px; text-align: left; font-size: 12px; }
+          td { padding: 10px; border-bottom: 1px solid #E5E7EB; font-size: 12px; }
+          tr:nth-child(even) { background: #F9FAFB; }
+          .income { color: #16A34A; font-weight: bold; }
+          .expense { color: #DC2626; font-weight: bold; }
+          .footer { margin-top: 30px; text-align: center; color: #999; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <h1>${businessName}</h1>
+        <div class="subtitle">${translate("transactions")} — ${dateLabel} (${filteredTransactions.length} ${translate("transactions").toLowerCase()})</div>
+        <div class="summary">
+          <div class="summary-box income-box">
+            <div class="summary-label">${translate("totalIncome")}</div>
+            <div class="summary-value" style="color:#16A34A">+${formatCurrency(totals.income, state.profile.currency)}</div>
+          </div>
+          <div class="summary-box expense-box">
+            <div class="summary-label">${translate("totalExpense")}</div>
+            <div class="summary-value" style="color:#DC2626">-${formatCurrency(totals.expense, state.profile.currency)}</div>
+          </div>
+          <div class="summary-box balance-box">
+            <div class="summary-label">${translate("totalBalance")}</div>
+            <div class="summary-value" style="color:#0D9488">${formatCurrency(totals.balance, state.profile.currency)}</div>
+          </div>
+        </div>
+        <table>
+          <tr><th>#</th><th>${translate("date")}</th><th>${translate("type")}</th><th>${translate("category")}</th><th>${translate("description")}</th><th>${translate("amount")}</th></tr>
+          ${filteredTransactions
+            .map(
+              (tx, i) =>
+                `<tr>
+                  <td>${i + 1}</td>
+                  <td>${new Date(tx.date).toLocaleDateString()}</td>
+                  <td>${tx.type === "income" ? translate("income") : translate("expense")}</td>
+                  <td>${getCategoryName(tx.categoryId)}</td>
+                  <td>${tx.description || "-"}</td>
+                  <td class="${tx.type}">${tx.type === "income" ? "+" : "-"}${formatCurrency(tx.amount, state.profile.currency)}</td>
+                </tr>`
+            )
+            .join("")}
+        </table>
+        <div class="footer">${businessName} · ${new Date().toLocaleDateString()}</div>
+      </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === "web") {
+        const w = window.open("", "_blank");
+        if (w) {
+          w.document.write(html);
+          w.document.close();
+          w.print();
+        }
+      } else {
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri);
+      }
+    } catch (e) {
+      Alert.alert(translate("error"), String(e));
+    }
   };
 
   const renderTransaction = ({ item }: { item: Transaction }) => (
@@ -129,6 +272,14 @@ export default function TransactionsScreen() {
     { key: "expense", label: translate("expense") },
   ];
 
+  const dateRanges: { key: DateRange; label: string }[] = [
+    { key: "all", label: translate("all") },
+    { key: "today", label: translate("today") },
+    { key: "week", label: translate("thisWeek") },
+    { key: "month", label: translate("thisMonth") },
+    { key: "year", label: translate("thisYear") },
+  ];
+
   return (
     <ScreenContainer className="flex-1">
       {/* Header */}
@@ -136,6 +287,45 @@ export default function TransactionsScreen() {
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>
           {translate("transactions")}
         </Text>
+        <Pressable
+          onPress={() => setExportMenuVisible(true)}
+          style={({ pressed }) => [
+            styles.exportBtn,
+            { backgroundColor: colors.primary + "15", opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <IconSymbol name="square.and.arrow.up" size={18} color={colors.primary} />
+          <Text style={[styles.exportBtnText, { color: colors.primary }]}>
+            {translate("export")}
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Date Range Bar */}
+      <View style={styles.dateRangeBar}>
+        {dateRanges.map((dr) => (
+          <Pressable
+            key={dr.key}
+            onPress={() => setDateRange(dr.key)}
+            style={({ pressed }) => [
+              styles.dateRangeBtn,
+              {
+                backgroundColor: dateRange === dr.key ? colors.primary + "20" : "transparent",
+                borderColor: dateRange === dr.key ? colors.primary : colors.border,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.dateRangeText,
+                { color: dateRange === dr.key ? colors.primary : colors.muted },
+              ]}
+            >
+              {dr.label}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {/* Filter Bar */}
@@ -162,6 +352,30 @@ export default function TransactionsScreen() {
             </Text>
           </Pressable>
         ))}
+      </View>
+
+      {/* Summary Bar */}
+      <View style={[styles.summaryBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryLabel, { color: colors.muted }]}>{translate("income")}</Text>
+          <Text style={[styles.summaryValue, { color: colors.success }]}>
+            +{formatCurrency(totals.income, state.profile.currency)}
+          </Text>
+        </View>
+        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryLabel, { color: colors.muted }]}>{translate("expense")}</Text>
+          <Text style={[styles.summaryValue, { color: colors.error }]}>
+            -{formatCurrency(totals.expense, state.profile.currency)}
+          </Text>
+        </View>
+        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryLabel, { color: colors.muted }]}>{translate("balance")}</Text>
+          <Text style={[styles.summaryValue, { color: colors.primary }]}>
+            {formatCurrency(totals.balance, state.profile.currency)}
+          </Text>
+        </View>
       </View>
 
       {/* Transaction List */}
@@ -194,6 +408,61 @@ export default function TransactionsScreen() {
       >
         <IconSymbol name="plus.circle.fill" size={28} color="#FFF" />
       </Pressable>
+
+      {/* Export Menu Modal */}
+      <Modal visible={exportMenuVisible} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setExportMenuVisible(false)}>
+          <View style={[styles.exportMenu, { backgroundColor: colors.background }]}>
+            <Text style={[styles.exportMenuTitle, { color: colors.foreground }]}>
+              {translate("exportTransactions")}
+            </Text>
+            <Text style={[styles.exportMenuSubtitle, { color: colors.muted }]}>
+              {filteredTransactions.length} {translate("transactions").toLowerCase()}
+            </Text>
+            <Pressable
+              onPress={exportAsPDF}
+              style={({ pressed }) => [
+                styles.exportOption,
+                { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <IconSymbol name="doc.text" size={22} color={colors.error} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.exportOptionTitle, { color: colors.foreground }]}>PDF</Text>
+                <Text style={[styles.exportOptionDesc, { color: colors.muted }]}>
+                  {translate("exportPdfDesc")}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={exportAsCSV}
+              style={({ pressed }) => [
+                styles.exportOption,
+                { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <IconSymbol name="doc.text" size={22} color={colors.success} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.exportOptionTitle, { color: colors.foreground }]}>CSV</Text>
+                <Text style={[styles.exportOptionDesc, { color: colors.muted }]}>
+                  {translate("exportCsvDesc")}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={() => setExportMenuVisible(false)}
+              style={({ pressed }) => [
+                styles.exportCancel,
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Text style={[styles.exportCancelText, { color: colors.muted }]}>
+                {translate("cancel")}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -203,16 +472,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: "800",
   },
+  exportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  exportBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  dateRangeBar: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 8,
+    marginBottom: 10,
+  },
+  dateRangeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  dateRangeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
   filterBar: {
     flexDirection: "row",
     paddingHorizontal: 20,
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   filterBtn: {
     paddingHorizontal: 20,
@@ -222,6 +522,31 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  summaryBar: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 30,
   },
   transactionItem: {
     flexDirection: "row",
@@ -276,5 +601,49 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  exportMenu: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+  },
+  exportMenuTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  exportMenuSubtitle: {
+    fontSize: 13,
+    marginBottom: 20,
+  },
+  exportOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  exportOptionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  exportOptionDesc: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  exportCancel: {
+    alignItems: "center",
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  exportCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

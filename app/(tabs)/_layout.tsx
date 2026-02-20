@@ -20,8 +20,11 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.muted,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarLabelStyle: {
+          fontSize: 10,
+        },
         tabBarStyle: {
-          paddingTop: 8,
+          paddingTop: 6,
           paddingBottom: bottomPadding,
           height: tabBarHeight,
           backgroundColor: colors.background,
@@ -34,49 +37,51 @@ export default function TabLayout() {
         name="index"
         options={{
           title: translate("dashboard"),
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="transactions"
         options={{
           title: translate("transactions"),
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="list.bullet" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="reports"
-        options={{
-          title: translate("reports"),
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="chart.bar.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="stock"
-        options={{
-          title: translate("stock"),
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="shippingbox.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="invoices"
-        options={{
-          title: translate("invoices"),
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="doc.text.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="list.bullet" color={color} />,
         }}
       />
       <Tabs.Screen
         name="contacts"
         options={{
           title: translate("contacts"),
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="person.2.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.2.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="stock"
+        options={{
+          title: translate("stock"),
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="shippingbox.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="invoices"
+        options={{
+          title: translate("invoices"),
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="doc.text.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="reports"
+        options={{
+          title: translate("reports"),
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="chart.bar.fill" color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: translate("settings"),
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="gearshape.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gearshape.fill" color={color} />,
+          href: null,
         }}
       />
     </Tabs>

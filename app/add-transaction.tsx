@@ -85,7 +85,7 @@ export default function AddTransactionScreen() {
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {/* Type Toggle */}
           <View style={[styles.typeToggle, { backgroundColor: colors.surface }]}>
             <Pressable

@@ -8,10 +8,7 @@ import {
   StyleSheet,
   Alert,
   Modal,
-  Image,
-  Platform,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
@@ -32,6 +29,7 @@ export default function SettingsScreen() {
   const [businessInput, setBusinessInput] = useState(state.profile.businessName);
 
   const handleExport = () => {
+    // Build CSV
     const headers = "Date,Type,Category,Amount,Description\n";
     const rows = state.transactions
       .map((tx) => {
@@ -56,33 +54,6 @@ export default function SettingsScreen() {
     Alert.alert(translate("confirm"), translate("deleteConfirm"), [
       { text: translate("cancel"), style: "cancel" },
       { text: translate("delete"), style: "destructive", onPress: () => deleteCategory(id) },
-    ]);
-  };
-
-  const handlePickLogo = async () => {
-    if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission needed", "Please allow access to your photo library.");
-        return;
-      }
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      updateProfile({ logoUri: result.assets[0].uri });
-      Alert.alert(translate("success"), translate("logoUpdated"));
-    }
-  };
-
-  const handleRemoveLogo = () => {
-    Alert.alert(translate("removeLogo"), translate("deleteConfirm"), [
-      { text: translate("cancel"), style: "cancel" },
-      { text: translate("delete"), style: "destructive", onPress: () => updateProfile({ logoUri: "" }) },
     ]);
   };
 
@@ -130,53 +101,6 @@ export default function SettingsScreen() {
 
         {/* Profile Section */}
         <Text style={[styles.sectionTitle, { color: colors.muted }]}>{translate("profile")}</Text>
-
-        {/* Company Logo */}
-        <View style={[styles.logoSection, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.logoLabel, { color: colors.foreground }]}>{translate("companyLogo")}</Text>
-          <View style={styles.logoRow}>
-            {state.profile.logoUri ? (
-              <Pressable onPress={handlePickLogo} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
-                <Image source={{ uri: state.profile.logoUri }} style={[styles.logoImage, { borderColor: colors.border }]} />
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={handlePickLogo}
-                style={({ pressed }) => [
-                  styles.logoPlaceholder,
-                  { backgroundColor: colors.primary + "10", borderColor: colors.primary + "40", opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <IconSymbol name="camera.fill" size={28} color={colors.primary} />
-                <Text style={[styles.logoPlaceholderText, { color: colors.primary }]}>{translate("uploadLogo")}</Text>
-              </Pressable>
-            )}
-            <View style={styles.logoActions}>
-              <Pressable
-                onPress={handlePickLogo}
-                style={({ pressed }) => [
-                  styles.logoBtn,
-                  { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 },
-                ]}
-              >
-                <Text style={styles.logoBtnText}>
-                  {state.profile.logoUri ? translate("changeLogo") : translate("uploadLogo")}
-                </Text>
-              </Pressable>
-              {state.profile.logoUri ? (
-                <Pressable
-                  onPress={handleRemoveLogo}
-                  style={({ pressed }) => [
-                    styles.logoBtn,
-                    { backgroundColor: colors.error + "15", opacity: pressed ? 0.8 : 1 },
-                  ]}
-                >
-                  <Text style={[styles.logoBtnText, { color: colors.error }]}>{translate("removeLogo")}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </View>
-        </View>
 
         {editingName ? (
           <View style={[styles.editRow, { backgroundColor: colors.surface }]}>
@@ -518,58 +442,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-  },
-  // Logo section
-  logoSection: {
-    marginHorizontal: 20,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 4,
-  },
-  logoLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  logoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  logoImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  logoPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoPlaceholderText: {
-    fontSize: 10,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  logoActions: {
-    flex: 1,
-    gap: 8,
-  },
-  logoBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  logoBtnText: {
-    color: "#FFF",
-    fontSize: 13,
-    fontWeight: "600",
   },
   aboutCard: {
     marginHorizontal: 20,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import {
   Text,
   View,
@@ -10,6 +10,8 @@ import {
   TextInput,
   Platform,
   Linking,
+  Animated,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -19,6 +21,12 @@ import { useColors } from "@/hooks/use-colors";
 import { calculateContactBalance, formatCurrency, DebtEntry } from "@/lib/store";
 import * as SMS from "expo-sms";
 import * as Haptics from "expo-haptics";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+
+const HEADER_MAX_HEIGHT = 180;
+const HEADER_MIN_HEIGHT = 0;
+const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
 export default function ContactDetailScreen() {
   const { contactId } = useLocalSearchParams<{ contactId: string }>();
@@ -30,6 +38,7 @@ export default function ContactDetailScreen() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const contact = useMemo(
     () => state.contacts.find((c) => c.id === contactId),
@@ -62,6 +71,18 @@ export default function ContactDetailScreen() {
 
   const netBalance = balance.netBalance;
   const balanceColor = netBalance > 0 ? colors.success : netBalance < 0 ? colors.error : colors.muted;
+
+  // Animated header collapse
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+    extrapolate: "clamp",
+  });
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_SCROLL_DISTANCE * 0.6],
+    outputRange: [1, 0],
+    extrapolate: "clamp",
+  });
 
   // Build reminder message
   const getReminderMessage = () => {
@@ -97,7 +118,6 @@ export default function ContactDetailScreen() {
       Alert.alert(translate("error"), translate("noPhoneNumber"));
       return;
     }
-    // Clean phone number (remove spaces, dashes, etc.)
     const cleanPhone = contact.phone.replace(/[^0-9+]/g, "");
     const message = encodeURIComponent(getReminderMessage());
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${message}`;
@@ -124,8 +144,6 @@ export default function ContactDetailScreen() {
       return;
     }
 
-    // If they owe me (netBalance > 0), a payment means they paid me back → record as "iOweThem" (reduces what they owe)
-    // If I owe them (netBalance < 0), a payment means I paid them → record as "theyOweMe" (reduces what I owe)
     const paymentType = netBalance > 0 ? "iOweThem" : "theyOweMe";
     const desc = paymentNote.trim() || (netBalance > 0 ? translate("paymentReceived") : translate("paymentMade"));
 
@@ -153,7 +171,12 @@ export default function ContactDetailScreen() {
         { text: translate("cancel"), style: "cancel" },
         {
           text: translate("confirm"),
-          onPress: () => settleContact(contact.id),
+          onPress: () => {
+            settleContact(contact.id);
+            if (Platform.OS !== "web") {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+          },
         },
       ]
     );
@@ -190,6 +213,50 @@ export default function ContactDetailScreen() {
         },
       ]
     );
+  };
+
+  // Export contact records as PDF
+  const handleExportRecords = async () => {
+    const currency = state.profile.currency;
+    const rows = entries.map((e) => {
+      const isCredit = e.type === "theyOweMe";
+      return `<tr>
+        <td>${new Date(e.date).toLocaleDateString()}</td>
+        <td>${e.description || (isCredit ? translate("theyOweMe") : translate("iOweThem"))}</td>
+        <td style="color:${isCredit ? "#22C55E" : "#EF4444"}">${isCredit ? "+" : "-"}${formatCurrency(e.amount, currency)}</td>
+      </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+      body{font-family:-apple-system,sans-serif;padding:30px;color:#333;max-width:700px;margin:0 auto}
+      h1{font-size:22px;margin-bottom:4px}
+      .sub{color:#666;font-size:14px;margin-bottom:20px}
+      .summary{display:flex;gap:20px;margin-bottom:20px}
+      .summary-item{flex:1;background:#f8f9fa;border-radius:10px;padding:14px;text-align:center}
+      .summary-item .label{font-size:12px;color:#999}
+      .summary-item .value{font-size:20px;font-weight:700;margin-top:4px}
+      table{width:100%;border-collapse:collapse}
+      th{text-align:left;padding:10px 8px;border-bottom:2px solid #eee;font-size:13px;color:#999}
+      td{padding:10px 8px;border-bottom:1px solid #f0f0f0;font-size:14px}
+      .footer{margin-top:30px;text-align:center;font-size:12px;color:#999}
+    </style></head><body>
+      <h1>${contact.name}</h1>
+      <p class="sub">${contact.phone || ""} ${contact.note ? "· " + contact.note : ""}</p>
+      <div class="summary">
+        <div class="summary-item"><div class="label">${translate("theyOweMe")}</div><div class="value" style="color:#22C55E">${formatCurrency(balance.theyOweMe, currency)}</div></div>
+        <div class="summary-item"><div class="label">${translate("iOweThem")}</div><div class="value" style="color:#EF4444">${formatCurrency(balance.iOweThem, currency)}</div></div>
+        <div class="summary-item"><div class="label">${translate("netBalance")}</div><div class="value" style="color:${netBalance >= 0 ? "#22C55E" : "#EF4444"}">${netBalance >= 0 ? "+" : "-"}${formatCurrency(Math.abs(netBalance), currency)}</div></div>
+      </div>
+      <table><thead><tr><th>${translate("date")}</th><th>${translate("description")}</th><th>${translate("amount")}</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="footer">${state.profile.businessName || "Mon Business"} · ${new Date().toLocaleDateString()}</div>
+    </body></html>`;
+
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: `${contact.name}_records.pdf` });
+    } catch (e) {
+      console.error("Export error:", e);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -243,43 +310,46 @@ export default function ContactDetailScreen() {
           <IconSymbol name="chevron.right" size={22} color={colors.primary} style={{ transform: [{ scaleX: -1 }] }} />
           <Text style={[styles.backText, { color: colors.primary }]}>{translate("contacts")}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleDeleteContact} activeOpacity={0.7}>
-          <IconSymbol name="trash.fill" size={22} color={colors.error} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 16 }}>
+          <TouchableOpacity onPress={handleExportRecords} activeOpacity={0.7}>
+            <IconSymbol name="square.and.arrow.up" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDeleteContact} activeOpacity={0.7}>
+            <IconSymbol name="trash.fill" size={22} color={colors.error} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Contact Info */}
-      <View style={styles.contactHeader}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary + "20" }]}>
-          <Text style={[styles.avatarText, { color: colors.primary }]}>
-            {contact.name.charAt(0).toUpperCase()}
-          </Text>
+      {/* Collapsible Contact Profile */}
+      <Animated.View style={{ height: headerHeight, opacity: headerOpacity, overflow: "hidden" }}>
+        <View style={styles.contactHeader}>
+          <View style={[styles.avatar, { backgroundColor: colors.primary + "20" }]}>
+            <Text style={[styles.avatarText, { color: colors.primary }]}>
+              {contact.name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <Text style={[styles.contactName, { color: colors.foreground }]}>{contact.name}</Text>
+          {contact.phone ? (
+            <Text style={[styles.contactPhone, { color: colors.muted }]}>{contact.phone}</Text>
+          ) : null}
+          {contact.note ? (
+            <Text style={[styles.contactNote, { color: colors.muted }]}>{contact.note}</Text>
+          ) : null}
         </View>
-        <Text style={[styles.contactName, { color: colors.foreground }]}>{contact.name}</Text>
-        {contact.phone ? (
-          <Text style={[styles.contactPhone, { color: colors.muted }]}>{contact.phone}</Text>
-        ) : null}
-        {contact.note ? (
-          <Text style={[styles.contactNote, { color: colors.muted }]}>{contact.note}</Text>
-        ) : null}
-      </View>
+      </Animated.View>
 
       {/* Balance Card */}
       <View style={[styles.balanceCard, { backgroundColor: balanceColor + "10", borderColor: balanceColor + "30" }]}>
         <View style={styles.balanceRow}>
           <View style={styles.balanceItem}>
-            <Text style={[styles.balanceItemLabel, { color: colors.success }]}>
-              {translate("theyOweMe")}
-            </Text>
+            <Text style={[styles.balanceItemLabel, { color: colors.success }]}>{translate("theyOweMe")}</Text>
             <Text style={[styles.balanceItemAmount, { color: colors.success }]}>
               {formatCurrency(balance.theyOweMe, state.profile.currency)}
             </Text>
           </View>
           <View style={[styles.balanceDivider, { backgroundColor: colors.border }]} />
           <View style={styles.balanceItem}>
-            <Text style={[styles.balanceItemLabel, { color: colors.error }]}>
-              {translate("iOweThem")}
-            </Text>
+            <Text style={[styles.balanceItemLabel, { color: colors.error }]}>{translate("iOweThem")}</Text>
             <Text style={[styles.balanceItemAmount, { color: colors.error }]}>
               {formatCurrency(balance.iOweThem, state.profile.currency)}
             </Text>
@@ -345,7 +415,7 @@ export default function ContactDetailScreen() {
             <Text style={[styles.actionButton2Text, { color: colors.warning }]}>{translate("sendReminder")}</Text>
           </TouchableOpacity>
         )}
-        {entries.length > 1 && (
+        {entries.length > 0 && (
           <TouchableOpacity
             style={[styles.actionButton2, { backgroundColor: colors.muted + "15", borderColor: colors.muted + "40" }]}
             activeOpacity={0.7}
@@ -369,6 +439,11 @@ export default function ContactDetailScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderEntry}
         contentContainerStyle={styles.listContent}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.muted }]}>
@@ -432,7 +507,10 @@ export default function ContactDetailScreen() {
 
       {/* Payment Modal */}
       <Modal visible={showPaymentModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
           <View style={[styles.paymentModal, { backgroundColor: colors.background }]}>
             <View style={styles.paymentHeader}>
               <Text style={[styles.paymentTitle, { color: colors.foreground }]}>
@@ -443,7 +521,6 @@ export default function ContactDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Balance info */}
             <View style={[styles.paymentBalanceInfo, { backgroundColor: balanceColor + "10", borderColor: balanceColor + "30" }]}>
               <Text style={[styles.paymentBalanceLabel, { color: balanceColor }]}>
                 {netBalance > 0 ? translate("totalOwedToYou") : translate("totalYouOwe")}
@@ -453,7 +530,6 @@ export default function ContactDetailScreen() {
               </Text>
             </View>
 
-            {/* Amount input */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: colors.foreground }]}>
                 {translate("paymentAmount")} ({state.profile.currency})
@@ -469,7 +545,6 @@ export default function ContactDetailScreen() {
               />
             </View>
 
-            {/* Pay full button */}
             <TouchableOpacity
               style={[styles.payFullButton, { borderColor: colors.primary }]}
               activeOpacity={0.7}
@@ -478,7 +553,6 @@ export default function ContactDetailScreen() {
               <Text style={[styles.payFullText, { color: colors.primary }]}>{translate("payFull")}</Text>
             </TouchableOpacity>
 
-            {/* Note input */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: colors.foreground }]}>
                 {translate("note")}
@@ -493,7 +567,6 @@ export default function ContactDetailScreen() {
               />
             </View>
 
-            {/* Remaining balance preview */}
             {parseFloat(paymentAmount) > 0 && (
               <View style={[styles.remainingRow, { borderTopColor: colors.border }]}>
                 <Text style={[styles.remainingLabel, { color: colors.muted }]}>{translate("remainingBalance")}</Text>
@@ -503,7 +576,6 @@ export default function ContactDetailScreen() {
               </View>
             )}
 
-            {/* Save button */}
             <TouchableOpacity
               style={[styles.saveButton, { backgroundColor: colors.primary, opacity: paymentIsValid ? 1 : 0.5 }]}
               activeOpacity={0.7}
@@ -515,7 +587,7 @@ export default function ContactDetailScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );
@@ -544,19 +616,19 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   avatarText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700",
   },
   contactName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
   },
   contactPhone: {
@@ -702,7 +774,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
   },
-  // Reminder Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -751,7 +822,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
-  // Payment Modal
   paymentModal: {
     position: "absolute",
     bottom: 0,

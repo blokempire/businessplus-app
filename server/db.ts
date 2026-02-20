@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -89,4 +89,57 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ─── Admin: User Management ────────────────────────────────────────
+
+/** List all users ordered by most recent sign-in */
+export async function getAllUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(users).orderBy(desc(users.lastSignedIn));
+}
+
+/** Get a single user by ID */
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/** Update user role (user ↔ admin) */
+export async function updateUserRole(id: number, role: "user" | "admin") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ role }).where(eq(users.id, id));
+}
+
+/** Update user status (active ↔ restricted) */
+export async function updateUserStatus(id: number, status: "active" | "restricted") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ status }).where(eq(users.id, id));
+}
+
+/** Delete a user by ID */
+export async function deleteUser(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(users).where(eq(users.id, id));
+}
+
+/** Get user stats for admin dashboard */
+export async function getUserStats() {
+  const db = await getDb();
+  if (!db) return { total: 0, active: 0, restricted: 0, admins: 0 };
+
+  const result = await db
+    .select({
+      total: sql<number>`COUNT(*)`,
+      active: sql<number>`SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END)`,
+      restricted: sql<number>`SUM(CASE WHEN status = 'restricted' THEN 1 ELSE 0 END)`,
+      admins: sql<number>`SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END)`,
+    })
+    .from(users);
+
+  return result[0] || { total: 0, active: 0, restricted: 0, admins: 0 };
+}

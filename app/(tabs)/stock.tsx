@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Text, View, FlatList, TouchableOpacity, TextInput, Alert } from "react-native";
+import { Text, View, FlatList, TouchableOpacity, TextInput, Alert, Modal, Pressable, Platform, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -7,12 +7,15 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { formatCurrency, Product } from "@/lib/store";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 
 export default function StockScreen() {
   const { state, translate, deleteProduct } = useApp();
   const colors = useColors();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [exportMenuVisible, setExportMenuVisible] = useState(false);
 
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return state.products;
@@ -39,6 +42,149 @@ export default function StockScreen() {
       { text: translate("cancel"), style: "cancel" },
       { text: translate("delete"), style: "destructive", onPress: () => deleteProduct(product.id) },
     ]);
+  };
+
+  const getStockStatusText = (qty: number) => {
+    if (qty === 0) return "Out of Stock";
+    if (qty <= 5) return "Low Stock";
+    return "In Stock";
+  };
+
+  const exportAsCSV = async () => {
+    setExportMenuVisible(false);
+    if (filteredProducts.length === 0) {
+      Alert.alert(translate("noDataToExport"));
+      return;
+    }
+    const header = "Name,Price,Quantity,Unit,Description,Value,Status\n";
+    const rows = filteredProducts
+      .map(
+        (p) =>
+          `"${p.name}",${p.price},${p.quantity},"${p.unit}","${p.description || ""}",${p.price * p.quantity},${getStockStatusText(p.quantity)}`
+      )
+      .join("\n");
+    const summary = `\n\n${translate("totalProducts")},${totalItems}\n${translate("stockValue")},${totalValue}`;
+    const csv = header + rows + summary;
+
+    if (Platform.OS === "web") {
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `inventory_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      try {
+        const { uri } = await Print.printToFileAsync({ html: `<pre>${csv}</pre>` });
+        await Sharing.shareAsync(uri);
+      } catch (e) {
+        Alert.alert(translate("error"), String(e));
+      }
+    }
+  };
+
+  const exportAsPDF = async () => {
+    setExportMenuVisible(false);
+    if (filteredProducts.length === 0) {
+      Alert.alert(translate("noDataToExport"));
+      return;
+    }
+    const businessName = state.profile.businessName || "Mon Business";
+    const outOfStock = filteredProducts.filter((p) => p.quantity === 0).length;
+    const lowStock = filteredProducts.filter((p) => p.quantity > 0 && p.quantity <= 5).length;
+    const inStock = filteredProducts.filter((p) => p.quantity > 5).length;
+
+    const html = `
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 30px; color: #333; }
+          h1 { color: #0D9488; margin-bottom: 4px; }
+          .subtitle { color: #666; margin-bottom: 20px; }
+          .summary { display: flex; gap: 12px; margin-bottom: 24px; }
+          .summary-box { flex: 1; padding: 14px; border-radius: 10px; text-align: center; }
+          .total-box { background: #F0FDFA; }
+          .value-box { background: #F0F9FF; }
+          .instock-box { background: #ECFDF5; }
+          .low-box { background: #FFFBEB; }
+          .out-box { background: #FEF2F2; }
+          .summary-label { font-size: 11px; color: #666; }
+          .summary-value { font-size: 18px; font-weight: bold; margin-top: 4px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+          th { background: #0D9488; color: white; padding: 10px; text-align: left; font-size: 12px; }
+          td { padding: 10px; border-bottom: 1px solid #E5E7EB; font-size: 12px; }
+          tr:nth-child(even) { background: #F9FAFB; }
+          .in-stock { color: #16A34A; font-weight: bold; }
+          .low-stock { color: #D97706; font-weight: bold; }
+          .out-of-stock { color: #DC2626; font-weight: bold; }
+          .footer { margin-top: 30px; text-align: center; color: #999; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <h1>${businessName}</h1>
+        <div class="subtitle">${translate("inventoryReport")} — ${filteredProducts.length} ${translate("products").toLowerCase()}</div>
+        <div class="summary">
+          <div class="summary-box total-box">
+            <div class="summary-label">${translate("totalProducts")}</div>
+            <div class="summary-value">${totalItems}</div>
+          </div>
+          <div class="summary-box value-box">
+            <div class="summary-label">${translate("stockValue")}</div>
+            <div class="summary-value" style="color:#0D9488">${formatCurrency(totalValue, state.profile.currency)}</div>
+          </div>
+          <div class="summary-box instock-box">
+            <div class="summary-label">${translate("inStock")}</div>
+            <div class="summary-value" style="color:#16A34A">${inStock}</div>
+          </div>
+          <div class="summary-box low-box">
+            <div class="summary-label">${translate("lowStock")}</div>
+            <div class="summary-value" style="color:#D97706">${lowStock}</div>
+          </div>
+          <div class="summary-box out-box">
+            <div class="summary-label">${translate("outOfStock")}</div>
+            <div class="summary-value" style="color:#DC2626">${outOfStock}</div>
+          </div>
+        </div>
+        <table>
+          <tr><th>#</th><th>${translate("productName")}</th><th>${translate("productPrice")}</th><th>${translate("stock")}</th><th>${translate("products")}</th><th>${translate("stockValue")}</th><th>Status</th></tr>
+          ${filteredProducts
+            .map((p, i) => {
+              const statusClass = p.quantity === 0 ? "out-of-stock" : p.quantity <= 5 ? "low-stock" : "in-stock";
+              const statusText = getStockStatusText(p.quantity);
+              return `<tr>
+                <td>${i + 1}</td>
+                <td>${p.name}</td>
+                <td>${formatCurrency(p.price, state.profile.currency)}</td>
+                <td>${p.quantity}</td>
+                <td>${p.unit}</td>
+                <td>${formatCurrency(p.price * p.quantity, state.profile.currency)}</td>
+                <td class="${statusClass}">${statusText}</td>
+              </tr>`;
+            })
+            .join("")}
+        </table>
+        <div class="footer">${businessName} · ${new Date().toLocaleDateString()}</div>
+      </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === "web") {
+        const w = window.open("", "_blank");
+        if (w) {
+          w.document.write(html);
+          w.document.close();
+          w.print();
+        }
+      } else {
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri);
+      }
+    } catch (e) {
+      Alert.alert(translate("error"), String(e));
+    }
   };
 
   const renderProduct = ({ item }: { item: Product }) => {
@@ -80,13 +226,29 @@ export default function StockScreen() {
       {/* Header */}
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Text style={{ fontSize: 28, fontWeight: "700", color: colors.foreground }}>{translate("stock")}</Text>
-        <TouchableOpacity
-          style={{ backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, flexDirection: "row", alignItems: "center" }}
-          onPress={() => router.push("/add-product" as any)}
-        >
-          <IconSymbol name="plus" size={18} color={colors.background} />
-          <Text style={{ color: colors.background, fontWeight: "600", marginLeft: 4, fontSize: 14 }}>{translate("addProduct")}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable
+            onPress={() => setExportMenuVisible(true)}
+            style={({ pressed }) => ({
+              backgroundColor: colors.primary + "15",
+              borderRadius: 20,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              flexDirection: "row",
+              alignItems: "center",
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <IconSymbol name="square.and.arrow.up" size={16} color={colors.primary} />
+          </Pressable>
+          <TouchableOpacity
+            style={{ backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, flexDirection: "row", alignItems: "center" }}
+            onPress={() => router.push("/add-product" as any)}
+          >
+            <IconSymbol name="plus" size={18} color={colors.background} />
+            <Text style={{ color: colors.background, fontWeight: "600", marginLeft: 4, fontSize: 14 }}>{translate("addProduct")}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Summary Cards */}
@@ -128,6 +290,105 @@ export default function StockScreen() {
           </View>
         }
       />
+
+      {/* Export Menu Modal */}
+      <Modal visible={exportMenuVisible} transparent animationType="fade">
+        <Pressable style={s.modalOverlay} onPress={() => setExportMenuVisible(false)}>
+          <View style={[s.exportMenu, { backgroundColor: colors.background }]}>
+            <Text style={[s.exportMenuTitle, { color: colors.foreground }]}>
+              {translate("exportStock")}
+            </Text>
+            <Text style={[s.exportMenuSubtitle, { color: colors.muted }]}>
+              {filteredProducts.length} {translate("products").toLowerCase()}
+            </Text>
+            <Pressable
+              onPress={exportAsPDF}
+              style={({ pressed }) => [
+                s.exportOption,
+                { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <IconSymbol name="doc.text" size={22} color={colors.error} />
+              <View style={{ flex: 1 }}>
+                <Text style={[s.exportOptionTitle, { color: colors.foreground }]}>PDF</Text>
+                <Text style={[s.exportOptionDesc, { color: colors.muted }]}>
+                  {translate("exportPdfDesc")}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={exportAsCSV}
+              style={({ pressed }) => [
+                s.exportOption,
+                { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <IconSymbol name="doc.text" size={22} color={colors.success} />
+              <View style={{ flex: 1 }}>
+                <Text style={[s.exportOptionTitle, { color: colors.foreground }]}>CSV</Text>
+                <Text style={[s.exportOptionDesc, { color: colors.muted }]}>
+                  {translate("exportCsvDesc")}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={() => setExportMenuVisible(false)}
+              style={({ pressed }) => [s.exportCancel, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[s.exportCancelText, { color: colors.muted }]}>
+                {translate("cancel")}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
+
+const s = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  exportMenu: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+  },
+  exportMenuTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  exportMenuSubtitle: {
+    fontSize: 13,
+    marginBottom: 20,
+  },
+  exportOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  exportOptionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  exportOptionDesc: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  exportCancel: {
+    alignItems: "center",
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  exportCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});

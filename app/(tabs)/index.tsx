@@ -1,4 +1,4 @@
-import { FlatList, Text, View, Pressable, StyleSheet } from "react-native";
+import { FlatList, Text, View, Pressable, StyleSheet, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
@@ -6,11 +6,14 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { calculateTotals, formatCurrency, filterTransactionsByPeriod, Transaction } from "@/lib/store";
 import { useMemo } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function DashboardScreen() {
   const { state, translate } = useApp();
   const colors = useColors();
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user && (user as any).role === "admin";
 
   const allTotals = useMemo(() => calculateTotals(state.transactions), [state.transactions]);
   const todayTotals = useMemo(
@@ -96,7 +99,10 @@ export default function DashboardScreen() {
           <View>
             {/* Header */}
             <View style={styles.header}>
-              <View>
+              {state.profile.logoUri ? (
+                <Image source={{ uri: state.profile.logoUri }} style={styles.headerLogo} />
+              ) : null}
+              <View style={{ flex: 1 }}>
                 <Text style={[styles.greeting, { color: colors.muted }]}>
                   {translate("welcome")}
                 </Text>
@@ -163,6 +169,58 @@ export default function DashboardScreen() {
               </Pressable>
             </View>
 
+            {/* Navigation Shortcuts */}
+            <View style={styles.quickActions}>
+              <Pressable
+                onPress={() => router.push("/reports" as any)}
+                style={({ pressed }) => [
+                  styles.navShortcut,
+                  { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <IconSymbol name="chart.bar.fill" size={22} color={colors.primary} />
+                <Text style={[styles.navShortcutText, { color: colors.foreground }]}>
+                  {translate("reports")}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push("/settings" as any)}
+                style={({ pressed }) => [
+                  styles.navShortcut,
+                  { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <IconSymbol name="gearshape.fill" size={22} color={colors.primary} />
+                <Text style={[styles.navShortcutText, { color: colors.foreground }]}>
+                  {translate("settings")}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Admin Panel - visible only to admins */}
+            {isAdmin && (
+              <Pressable
+                onPress={() => router.push("/admin" as any)}
+                style={({ pressed }) => [
+                  styles.adminBanner,
+                  { backgroundColor: colors.warning + "15", borderColor: colors.warning + "40", opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <View style={[styles.adminIconBg, { backgroundColor: colors.warning + "25" }]}>
+                  <IconSymbol name="shield.fill" size={22} color={colors.warning} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.adminBannerTitle, { color: colors.foreground }]}>
+                    {translate("adminPanel")}
+                  </Text>
+                  <Text style={[styles.adminBannerDesc, { color: colors.muted }]}>
+                    {translate("userManagement")}
+                  </Text>
+                </View>
+                <IconSymbol name="chevron.right" size={16} color={colors.warning} />
+              </Pressable>
+            )}
+
             {/* Today's Summary */}
             <View style={[styles.todayCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
@@ -208,10 +266,15 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingTop: 8,
     paddingBottom: 16,
+    gap: 14,
+  },
+  headerLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
   },
   greeting: {
     fontSize: 14,
@@ -357,5 +420,43 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     fontWeight: "500",
+  },
+  navShortcut: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  navShortcutText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  adminBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 12,
+  },
+  adminIconBg: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  adminBannerTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  adminBannerDesc: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });

@@ -61,7 +61,7 @@ type Action =
   | { type: "DELETE_CONTACT"; payload: string }
   | { type: "ADD_DEBT_ENTRY"; payload: DebtEntry }
   | { type: "DELETE_DEBT_ENTRY"; payload: string }
-  | { type: "SETTLE_CONTACT"; payload: { contactId: string; settlementEntry: DebtEntry } }
+  | { type: "CLEAR_CONTACT_DEBTS"; payload: string }
   | { type: "ADD_PRODUCT"; payload: Product }
   | { type: "UPDATE_PRODUCT"; payload: Product }
   | { type: "DELETE_PRODUCT"; payload: string }
@@ -103,10 +103,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, debtEntries: [action.payload, ...state.debtEntries] };
     case "DELETE_DEBT_ENTRY":
       return { ...state, debtEntries: state.debtEntries.filter((e) => e.id !== action.payload) };
-    case "SETTLE_CONTACT": {
-      const filtered = state.debtEntries.filter((e) => e.contactId !== action.payload.contactId);
-      return { ...state, debtEntries: [action.payload.settlementEntry, ...filtered] };
-    }
+    case "CLEAR_CONTACT_DEBTS":
+      return { ...state, debtEntries: state.debtEntries.filter((e) => e.contactId !== action.payload) };
     case "ADD_PRODUCT":
       return { ...state, products: [action.payload, ...state.products] };
     case "UPDATE_PRODUCT":
@@ -153,7 +151,7 @@ interface AppContextType {
   deleteContact: (id: string) => void;
   addDebtEntry: (contactId: string, type: DebtType, amount: number, description: string, date: string) => void;
   deleteDebtEntry: (id: string) => void;
-  settleContact: (contactId: string) => void;
+  settleContact: (contactId: string) => void; // Clears all debts for this contact
   addProduct: (name: string, description: string, price: number, quantity: number, unit: string, photoUri: string) => Product;
   updateProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
@@ -238,6 +236,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const settleContact = useCallback(
     (contactId: string) => {
+      // Calculate the net balance before clearing
       let theyOweMe = 0;
       let iOweThem = 0;
       for (const entry of state.debtEntries) {
@@ -246,22 +245,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         else iOweThem += entry.amount;
       }
       const net = theyOweMe - iOweThem;
-      if (net === 0) {
-        dispatch({
-          type: "SETTLE_CONTACT",
-          payload: {
-            contactId,
-            settlementEntry: { id: generateId(), contactId, type: "theyOweMe", amount: 0, description: "Account settled", date: new Date().toISOString(), createdAt: new Date().toISOString() },
-          },
-        });
-        return;
+
+      // Find the contact name for the description
+      const contact = state.contacts.find((c) => c.id === contactId);
+      const contactName = contact?.name || "";
+
+      // If there's a remaining balance, record it as a transaction
+      if (net !== 0) {
+        const tx: Transaction = {
+          id: generateId(),
+          type: net > 0 ? "income" : "expense",
+          amount: Math.abs(net),
+          categoryId: net > 0 ? "inc_settlement" : "exp_settlement",
+          description: `${translate("settlementBalance")} - ${contactName}`,
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        };
+        dispatch({ type: "ADD_TRANSACTION", payload: tx });
       }
-      const settlementEntry: DebtEntry = {
-        id: generateId(), contactId, type: net > 0 ? "theyOweMe" : "iOweThem", amount: Math.abs(net),
-        description: "Settlement balance carried forward", date: new Date().toISOString(), createdAt: new Date().toISOString(),
-      };
-      dispatch({ type: "SETTLE_CONTACT", payload: { contactId, settlementEntry } });
-    }, [state.debtEntries]);
+
+      // Clear all debt entries for this contact
+      dispatch({ type: "CLEAR_CONTACT_DEBTS", payload: contactId });
+    }, [state.debtEntries, state.contacts, translate]);
 
   // ─── Product Actions ──────────────────────────────────────────────
 

@@ -28,6 +28,7 @@ export interface UserProfile {
   businessName: string;
   currency: string;
   language: Language;
+  logoUri: string; // local URI of company logo
 }
 
 export type DebtType = "theyOweMe" | "iOweThem";
@@ -130,6 +131,9 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: "exp_entertainment", nameKey: "entertainment", icon: "heart.fill", type: "expense", isCustom: false },
   { id: "exp_rent", nameKey: "rent", icon: "house.fill", type: "expense", isCustom: false },
   { id: "exp_other", nameKey: "otherExpense", icon: "ellipsis", type: "expense", isCustom: false },
+  // Settlement
+  { id: "inc_settlement", nameKey: "settlement", icon: "checkmark.circle.fill", type: "income", isCustom: false },
+  { id: "exp_settlement", nameKey: "settlement", icon: "checkmark.circle.fill", type: "expense", isCustom: false },
 ];
 
 export const DEFAULT_PROFILE: UserProfile = {
@@ -137,6 +141,7 @@ export const DEFAULT_PROFILE: UserProfile = {
   businessName: "",
   currency: "XOF",
   language: "en",
+  logoUri: "",
 };
 
 // ─── Storage Functions ───────────────────────────────────────────────
