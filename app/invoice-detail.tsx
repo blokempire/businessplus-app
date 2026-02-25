@@ -12,7 +12,7 @@ import { useColors } from "@/hooks/use-colors";
 import { formatCurrency } from "@/lib/store";
 
 export default function InvoiceDetailScreen() {
-  const { state, translate, updateInvoice, deleteInvoice } = useApp();
+  const { state, translate, updateInvoice, deleteInvoice, changeInvoiceStatus } = useApp();
   const colors = useColors();
   const router = useRouter();
   const params = useLocalSearchParams<{ invoiceId: string }>();
@@ -28,6 +28,42 @@ export default function InvoiceDetailScreen() {
 
   const currency = state.profile.currency;
 
+  const handleStatusChange = () => {
+    const options: { text: string; onPress?: () => void; style?: "cancel" | "destructive" }[] = [];
+
+    if (invoice.status !== "paid") {
+      options.push({
+        text: translate("markAsPaid"),
+        onPress: () => {
+          changeInvoiceStatus(invoice.id, "paid");
+          Alert.alert(translate("success"), translate("invoicePaid"));
+        },
+      });
+    }
+    if (invoice.status !== "pending") {
+      options.push({
+        text: translate("markAsPending"),
+        onPress: () => {
+          changeInvoiceStatus(invoice.id, "pending");
+          Alert.alert(translate("success"), translate("invoicePending"));
+        },
+      });
+    }
+    if (invoice.status !== "cancelled") {
+      options.push({
+        text: translate("markAsCancelled"),
+        style: "destructive",
+        onPress: () => {
+          changeInvoiceStatus(invoice.id, "cancelled");
+          Alert.alert(translate("success"), translate("invoiceCancelled"));
+        },
+      });
+    }
+    options.push({ text: translate("cancel"), style: "cancel" });
+
+    Alert.alert(translate("changeStatus"), "", options);
+  };
+
   const generateInvoiceHTML = () => {
     const itemsRows = invoice.items
       .map(
@@ -41,6 +77,12 @@ export default function InvoiceDetailScreen() {
       </tr>`
       )
       .join("");
+
+    const discountRow = (invoice.discountAmount && invoice.discountAmount > 0) ? `
+    <div class="row" style="color:#22C55E;">
+      <span>${translate("discount")}${invoice.discountType === "percentage" ? ` (${invoice.discountValue}%)` : ""}:</span>
+      <span>-${formatCurrency(invoice.discountAmount, currency)}</span>
+    </div>` : "";
 
     return `
 <!DOCTYPE html>
@@ -66,6 +108,7 @@ export default function InvoiceDetailScreen() {
     .status-pending { background: #FEE2E2; color: #EF4444; }
     .status-partial { background: #FEF3C7; color: #F59E0B; }
     .status-paid { background: #D1FAE5; color: #22C55E; }
+    .status-cancelled { background: #E5E7EB; color: #6B7280; }
     .note { background: #f8f9fa; padding: 16px; border-radius: 8px; margin-top: 20px; }
     .note h4 { font-size: 12px; color: #999; margin-bottom: 4px; }
     .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; }
@@ -117,6 +160,7 @@ export default function InvoiceDetailScreen() {
       <span>${translate("subtotal")}:</span>
       <span>${formatCurrency(invoice.subtotal, currency)}</span>
     </div>
+    ${discountRow}
     <div class="row">
       <span>${translate("taxAmount")}:</span>
       <span>${formatCurrency(invoice.tax, currency)}</span>
@@ -193,7 +237,17 @@ export default function InvoiceDetailScreen() {
     ]);
   };
 
-  const statusColor = invoice.status === "paid" ? colors.success : invoice.status === "partial" ? colors.warning : colors.error;
+  const statusColor =
+    invoice.status === "paid" ? colors.success
+    : invoice.status === "cancelled" ? colors.muted
+    : invoice.status === "partial" ? colors.warning
+    : colors.error;
+
+  const statusLabel =
+    invoice.status === "paid" ? translate("paid")
+    : invoice.status === "cancelled" ? translate("markAsCancelled")
+    : invoice.status === "partial" ? translate("partial")
+    : translate("pending");
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-4 pt-4">
@@ -209,14 +263,14 @@ export default function InvoiceDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Status Badge */}
-        <View style={{ alignItems: "center", marginBottom: 20 }}>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, backgroundColor: statusColor + "20" }}>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: statusColor }}>
-              {invoice.status === "paid" ? translate("paid") : invoice.status === "partial" ? translate("partial") : translate("pending")}
-            </Text>
+        {/* Status Badge — Tappable to change */}
+        <TouchableOpacity onPress={handleStatusChange} style={{ alignItems: "center", marginBottom: 20 }}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16, backgroundColor: statusColor + "20", flexDirection: "row", alignItems: "center" }}>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: statusColor }}>{statusLabel}</Text>
+            <IconSymbol name="chevron.right" size={14} color={statusColor} style={{ marginLeft: 6, transform: [{ rotate: "90deg" }] }} />
           </View>
-        </View>
+          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>{translate("changeStatus")}</Text>
+        </TouchableOpacity>
 
         {/* Invoice Info */}
         <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -258,6 +312,14 @@ export default function InvoiceDetailScreen() {
             <Text style={{ color: colors.muted }}>{translate("subtotal")}</Text>
             <Text style={{ color: colors.foreground }}>{formatCurrency(invoice.subtotal, currency)}</Text>
           </View>
+          {invoice.discountAmount && invoice.discountAmount > 0 ? (
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={{ color: colors.success }}>
+                {translate("discount")} {invoice.discountType === "percentage" ? `(${invoice.discountValue}%)` : ""}
+              </Text>
+              <Text style={{ color: colors.success }}>-{formatCurrency(invoice.discountAmount, currency)}</Text>
+            </View>
+          ) : null}
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
             <Text style={{ color: colors.muted }}>{translate("taxAmount")}</Text>
             <Text style={{ color: colors.foreground }}>{formatCurrency(invoice.tax, currency)}</Text>
@@ -315,6 +377,15 @@ export default function InvoiceDetailScreen() {
 
         {/* Action Buttons */}
         <View style={{ gap: 10, marginBottom: 40 }}>
+          {/* Status Change Button */}
+          <TouchableOpacity
+            onPress={handleStatusChange}
+            style={{ backgroundColor: statusColor + "20", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
+          >
+            <IconSymbol name="checkmark.circle.fill" size={20} color={statusColor} />
+            <Text style={{ color: statusColor, fontWeight: "600", marginLeft: 8, fontSize: 15 }}>{translate("changeStatus")}</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={handleSharePDF}
             style={{ backgroundColor: colors.primary, borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "center" }}

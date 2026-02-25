@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   Text,
   View,
@@ -10,13 +10,23 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import * as Contacts from "expo-contacts";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { calculateContactBalance, formatCurrency, Contact } from "@/lib/store";
+
+interface PhoneContact {
+  id: string;
+  name: string;
+  phone: string;
+  selected: boolean;
+}
 
 export default function ContactsScreen() {
   const { state, translate, addContact, deleteContact } = useApp();
@@ -24,10 +34,22 @@ export default function ContactsScreen() {
   const router = useRouter();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newNote, setNewNote] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Phone book import state
+  const [phoneContacts, setPhoneContacts] = useState<PhoneContact[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importSearch, setImportSearch] = useState("");
+
+  // Editable import state
+  const [showEditImport, setShowEditImport] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editNote, setEditNote] = useState("");
 
   // Calculate totals
   const summary = useMemo(() => {
@@ -52,6 +74,20 @@ export default function ContactsScreen() {
     );
   }, [state.contacts, searchQuery]);
 
+  // Filtered phone contacts for import
+  const filteredPhoneContacts = useMemo(() => {
+    if (!importSearch.trim()) return phoneContacts;
+    const q = importSearch.toLowerCase();
+    return phoneContacts.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q)
+    );
+  }, [phoneContacts, importSearch]);
+
+  const selectedCount = useMemo(
+    () => phoneContacts.filter((c) => c.selected).length,
+    [phoneContacts]
+  );
+
   const handleAddContact = () => {
     if (!newName.trim()) return;
     addContact(newName.trim(), newPhone.trim(), newNote.trim());
@@ -74,6 +110,79 @@ export default function ContactsScreen() {
         },
       ]
     );
+  };
+
+  // Phone book import
+  const handleImportFromPhoneBook = useCallback(async () => {
+    if (Platform.OS === "web") {
+      Alert.alert(translate("error"), "Phone book import is only available on mobile devices.");
+      return;
+    }
+    setImportLoading(true);
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(translate("error"), translate("contactsPermissionDenied"));
+        setImportLoading(false);
+        return;
+      }
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+      });
+      const mapped: PhoneContact[] = data
+        .filter((c) => c.name)
+        .map((c) => ({
+          id: c.id || String(Math.random()),
+          name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || c.name || "",
+          phone:
+            c.phoneNumbers && c.phoneNumbers.length > 0
+              ? c.phoneNumbers[0].number || ""
+              : "",
+          selected: false,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setPhoneContacts(mapped);
+      setShowImportModal(true);
+    } catch (e) {
+      Alert.alert(translate("error"), String(e));
+    }
+    setImportLoading(false);
+  }, [translate]);
+
+  const togglePhoneContact = (id: string) => {
+    setPhoneContacts((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, selected: !c.selected } : c))
+    );
+  };
+
+  const handleImportSelected = () => {
+    const selected = phoneContacts.filter((c) => c.selected);
+    if (selected.length === 0) return;
+    if (selected.length === 1) {
+      // Single contact — show edit form before saving
+      setEditName(selected[0].name);
+      setEditPhone(selected[0].phone);
+      setEditNote("");
+      setShowImportModal(false);
+      setShowEditImport(true);
+    } else {
+      // Multiple contacts — import all, user can edit later
+      for (const c of selected) {
+        addContact(c.name, c.phone, "");
+      }
+      setShowImportModal(false);
+      setPhoneContacts([]);
+    }
+  };
+
+  const handleSaveEditedImport = () => {
+    if (!editName.trim()) return;
+    addContact(editName.trim(), editPhone.trim(), editNote.trim());
+    setEditName("");
+    setEditPhone("");
+    setEditNote("");
+    setShowEditImport(false);
+    setPhoneContacts([]);
   };
 
   const renderContact = ({ item }: { item: Contact }) => {
@@ -138,13 +247,29 @@ export default function ContactsScreen() {
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>
           {translate("contacts")}
         </Text>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          activeOpacity={0.7}
-          onPress={() => setShowAddModal(true)}
-        >
-          <IconSymbol name="plus.circle.fill" size={20} color={colors.background} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {/* Import from Phone Book */}
+          <TouchableOpacity
+            style={[styles.importButton, { backgroundColor: colors.primary + "15" }]}
+            activeOpacity={0.7}
+            onPress={handleImportFromPhoneBook}
+            disabled={importLoading}
+          >
+            {importLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <IconSymbol name="person.2.fill" size={18} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+          {/* Add manually */}
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            activeOpacity={0.7}
+            onPress={() => setShowAddModal(true)}
+          >
+            <IconSymbol name="plus.circle.fill" size={20} color={colors.background} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Summary Cards */}
@@ -272,6 +397,158 @@ export default function ContactsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Import from Phone Book Modal */}
+      <Modal visible={showImportModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.importModalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                {translate("selectContacts")}
+              </Text>
+              <TouchableOpacity onPress={() => { setShowImportModal(false); setPhoneContacts([]); }} activeOpacity={0.7}>
+                <IconSymbol name="xmark" size={24} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Import search */}
+            <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 12 }]}>
+              <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.foreground }]}
+                placeholder={translate("search")}
+                placeholderTextColor={colors.muted}
+                value={importSearch}
+                onChangeText={setImportSearch}
+                returnKeyType="done"
+              />
+            </View>
+
+            {/* Selected count */}
+            <Text style={[styles.selectedCountText, { color: colors.primary }]}>
+              {selectedCount} {translate("selectedCount")}
+            </Text>
+
+            {/* Phone contacts list */}
+            <FlatList
+              data={filteredPhoneContacts}
+              keyExtractor={(item) => item.id}
+              style={{ flex: 1 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.phoneContactRow,
+                    {
+                      backgroundColor: item.selected ? colors.primary + "10" : colors.surface,
+                      borderColor: item.selected ? colors.primary : colors.border,
+                    },
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => togglePhoneContact(item.id)}
+                >
+                  <View style={[styles.checkbox, { borderColor: item.selected ? colors.primary : colors.muted, backgroundColor: item.selected ? colors.primary : "transparent" }]}>
+                    {item.selected && <IconSymbol name="checkmark" size={14} color="#FFF" />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.phoneContactName, { color: colors.foreground }]}>{item.name}</Text>
+                    {item.phone ? (
+                      <Text style={[styles.phoneContactPhone, { color: colors.muted }]}>{item.phone}</Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={[styles.emptyText, { color: colors.muted, textAlign: "center", paddingTop: 40 }]}>
+                  {translate("noContacts")}
+                </Text>
+              }
+            />
+
+            {/* Import button */}
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: colors.primary, opacity: selectedCount > 0 ? 1 : 0.5, marginTop: 12 }]}
+              activeOpacity={0.7}
+              onPress={handleImportSelected}
+              disabled={selectedCount === 0}
+            >
+              <Text style={[styles.saveButtonText, { color: colors.background }]}>
+                {translate("importSelected")} ({selectedCount})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Imported Contact Modal */}
+      <Modal visible={showEditImport} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                {translate("editContact")}
+              </Text>
+              <TouchableOpacity onPress={() => setShowEditImport(false)} activeOpacity={0.7}>
+                <IconSymbol name="xmark" size={24} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.foreground }]}>
+                {translate("contactName")} *
+              </Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
+                value={editName}
+                onChangeText={setEditName}
+                returnKeyType="done"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.foreground }]}>
+                {translate("phoneNumber")}
+              </Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
+                value={editPhone}
+                onChangeText={setEditPhone}
+                keyboardType="phone-pad"
+                returnKeyType="done"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.foreground }]}>
+                {translate("note")}
+              </Text>
+              <TextInput
+                style={[styles.input, styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
+                placeholder={translate("enterNote")}
+                placeholderTextColor={colors.muted}
+                value={editNote}
+                onChangeText={setEditNote}
+                multiline
+                numberOfLines={3}
+                returnKeyType="done"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: colors.primary, opacity: editName.trim() ? 1 : 0.5 }]}
+              activeOpacity={0.7}
+              onPress={handleSaveEditedImport}
+              disabled={!editName.trim()}
+            >
+              <Text style={[styles.saveButtonText, { color: colors.background }]}>
+                {translate("save")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -288,6 +565,18 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: "700",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  importButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
   },
   addButton: {
     width: 36,
@@ -403,11 +692,20 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 40,
   },
+  importModalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+    maxHeight: "85%",
+    flex: 1,
+    marginTop: "15%",
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 20,
@@ -443,5 +741,35 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  selectedCountText: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  phoneContactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 6,
+    borderWidth: 1,
+    gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  phoneContactName: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  phoneContactPhone: {
+    fontSize: 13,
+    marginTop: 2,
   },
 });

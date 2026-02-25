@@ -70,7 +70,9 @@ export interface InvoiceItem {
   total: number;
 }
 
-export type InvoiceStatus = "pending" | "paid" | "partial";
+export type InvoiceStatus = "pending" | "paid" | "partial" | "cancelled";
+
+export type DiscountType = "value" | "percentage";
 
 export interface Invoice {
   id: string;
@@ -79,8 +81,11 @@ export interface Invoice {
   contactName: string;
   items: InvoiceItem[];
   subtotal: number;
+  discountType: DiscountType;
+  discountValue: number; // raw discount input (amount or percentage)
+  discountAmount: number; // calculated discount in currency
   tax: number;
-  total: number;
+  total: number; // subtotal - discountAmount + tax
   status: InvoiceStatus;
   paidAmount: number;
   date: string;

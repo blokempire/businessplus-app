@@ -58,9 +58,9 @@
 - [x] Fix settle account: record remaining balance (sold) as income/expense transaction before clearing debts
 - [x] Fix footer tab bar icons — reduced to 5 visible tabs, Reports/Settings accessible from Dashboard
 - [x] Contact Detail — collapse profile header on scroll for more content space
-- [ ] Invoice status auto-debt — unpaid invoices automatically become debts
-- [ ] Transactions export by date range (PDF/CSV)
-- [ ] Stock/inventory export (PDF/CSV)
+- [x] Invoice status auto-debt — unpaid invoices automatically become debts
+- [x] Transactions export by date range (PDF/CSV)
+- [x] Stock/inventory export (PDF/CSV)
 - [x] Contact records/debt history export (PDF/CSV)
 - [x] Add company logo upload in Settings (pick from gallery or camera)
 - [x] Display company logo on Dashboard header
@@ -77,3 +77,10 @@
 - [x] Add date-range transaction export (CSV/PDF)
 - [x] Add stock/inventory export (CSV/PDF)
 - [x] Fix invoice auto-debt: unpaid invoices automatically create debt entries (already implemented)
+- [x] Fix settle account: do NOT wipe contact history, keep all old entries, add settlement payment entry alongside existing ones
+- [x] Fix settle account: remaining balance marked as paid, contact stays in list with history
+- [x] Fix transaction export: show date range (from date → to date) in export header
+- [x] Add contact phone book import (fetch from device, editable before saving)
+- [x] Add invoice discount field (supports both fixed value and percentage)
+- [x] Allow invoice status change directly on invoice (paid, cancelled, pending)
+- [x] When invoice is unpaid, auto-add as debt for the contact name (auto-debt on create, remove on paid/cancel)

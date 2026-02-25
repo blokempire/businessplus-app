@@ -155,7 +155,8 @@ interface AppContextType {
   addProduct: (name: string, description: string, price: number, quantity: number, unit: string, photoUri: string) => Product;
   updateProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
-  addInvoice: (contactId: string, contactName: string, items: InvoiceItem[], tax: number, note: string, dueDate: string, photoUris: string[]) => Invoice;
+  addInvoice: (contactId: string, contactName: string, items: InvoiceItem[], tax: number, note: string, dueDate: string, photoUris: string[], discountType?: import("./store").DiscountType, discountValue?: number) => Invoice;
+  changeInvoiceStatus: (invoiceId: string, newStatus: InvoiceStatus) => void;
   updateInvoice: (invoice: Invoice) => void;
   deleteInvoice: (id: string) => void;
 }
@@ -236,7 +237,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const settleContact = useCallback(
     (contactId: string) => {
-      // Calculate the net balance before clearing
+      // Calculate the net balance before settling
       let theyOweMe = 0;
       let iOweThem = 0;
       for (const entry of state.debtEntries) {
@@ -250,8 +251,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const contact = state.contacts.find((c) => c.id === contactId);
       const contactName = contact?.name || "";
 
-      // If there's a remaining balance, record it as a transaction
+      // If there's a remaining balance, record it as a transaction AND as a settlement debt entry
       if (net !== 0) {
+        // Record as a regular transaction (income if they paid us, expense if we paid them)
         const tx: Transaction = {
           id: generateId(),
           type: net > 0 ? "income" : "expense",
@@ -262,10 +264,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           createdAt: new Date().toISOString(),
         };
         dispatch({ type: "ADD_TRANSACTION", payload: tx });
-      }
 
-      // Clear all debt entries for this contact
-      dispatch({ type: "CLEAR_CONTACT_DEBTS", payload: contactId });
+        // Add a settlement entry to the contact's debt history (opposite of the net to zero out)
+        // This keeps the history visible — old entries stay, plus a new "settlement" entry
+        const settlementEntry: DebtEntry = {
+          id: generateId(),
+          contactId,
+          type: net > 0 ? "iOweThem" : "theyOweMe",
+          amount: Math.abs(net),
+          description: `${translate("settlementBalance")} - ${translate("accountSettled")}`,
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        };
+        dispatch({ type: "ADD_DEBT_ENTRY", payload: settlementEntry });
+      }
     }, [state.debtEntries, state.contacts, translate]);
 
   // ─── Product Actions ──────────────────────────────────────────────
@@ -283,9 +295,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ─── Invoice Actions ──────────────────────────────────────────────
 
   const addInvoice = useCallback(
-    (contactId: string, contactName: string, items: InvoiceItem[], tax: number, note: string, dueDate: string, photoUris: string[]): Invoice => {
+    (contactId: string, contactName: string, items: InvoiceItem[], tax: number, note: string, dueDate: string, photoUris: string[], discountType: import("./store").DiscountType = "value", discountValue: number = 0): Invoice => {
       const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-      const total = subtotal + tax;
+      const discountAmount = discountType === "percentage" ? (subtotal * discountValue) / 100 : discountValue;
+      const total = Math.max(0, subtotal - discountAmount + tax);
       const invoice: Invoice = {
         id: generateId(),
         invoiceNumber: generateInvoiceNumber(state.invoices),
@@ -293,6 +306,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         contactName,
         items,
         subtotal,
+        discountType,
+        discountValue,
+        discountAmount,
         tax,
         total,
         status: "pending",
@@ -332,6 +348,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateInvoice = useCallback((invoice: Invoice) => { dispatch({ type: "UPDATE_INVOICE", payload: invoice }); }, []);
   const deleteInvoice = useCallback((id: string) => { dispatch({ type: "DELETE_INVOICE", payload: id }); }, []);
 
+  // Change invoice status — when marked as paid, remove debt; when unpaid, add debt
+  const changeInvoiceStatus = useCallback((invoiceId: string, newStatus: InvoiceStatus) => {
+    const invoice = state.invoices.find((inv) => inv.id === invoiceId);
+    if (!invoice) return;
+    const updatedInvoice = { ...invoice, status: newStatus, paidAmount: newStatus === "paid" ? invoice.total : invoice.paidAmount };
+    dispatch({ type: "UPDATE_INVOICE", payload: updatedInvoice });
+
+    if (newStatus === "paid") {
+      // Remove the auto-created debt entry for this invoice
+      const debtDesc = `Invoice ${invoice.invoiceNumber}`;
+      const matchingDebt = state.debtEntries.find(
+        (e) => e.contactId === invoice.contactId && e.description === debtDesc
+      );
+      if (matchingDebt) {
+        dispatch({ type: "DELETE_DEBT_ENTRY", payload: matchingDebt.id });
+      }
+    } else if (newStatus === "cancelled") {
+      // Remove the auto-created debt entry for this invoice
+      const debtDesc = `Invoice ${invoice.invoiceNumber}`;
+      const matchingDebt = state.debtEntries.find(
+        (e) => e.contactId === invoice.contactId && e.description === debtDesc
+      );
+      if (matchingDebt) {
+        dispatch({ type: "DELETE_DEBT_ENTRY", payload: matchingDebt.id });
+      }
+    } else if (newStatus === "pending" && invoice.status !== "pending") {
+      // Re-add debt if changing back to pending
+      const debtEntry: DebtEntry = {
+        id: generateId(),
+        contactId: invoice.contactId,
+        type: "theyOweMe",
+        amount: invoice.total,
+        description: `Invoice ${invoice.invoiceNumber}`,
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      dispatch({ type: "ADD_DEBT_ENTRY", payload: debtEntry });
+    }
+  }, [state.invoices, state.debtEntries]);
+
   return (
     <AppContext.Provider
       value={{
@@ -342,7 +398,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addContact, updateContact, deleteContact,
         addDebtEntry, deleteDebtEntry, settleContact,
         addProduct, updateProduct, deleteProduct,
-        addInvoice, updateInvoice, deleteInvoice,
+        addInvoice, updateInvoice, deleteInvoice, changeInvoiceStatus,
       }}
     >
       {children}

@@ -106,8 +106,27 @@ export default function TransactionsScreen() {
     return { income, expense, balance: income - expense };
   }, [filteredTransactions]);
 
+  const getDateRangeLabel = () => {
+    if (dateRange === "all") return translate("all");
+    const now = new Date();
+    const start = new Date();
+    if (dateRange === "today") {
+      start.setHours(0, 0, 0, 0);
+    } else if (dateRange === "week") {
+      start.setDate(now.getDate() - 7);
+    } else if (dateRange === "month") {
+      start.setMonth(now.getMonth() - 1);
+    } else if (dateRange === "year") {
+      start.setFullYear(now.getFullYear() - 1);
+    }
+    const locale = state.language === "fr" ? "fr-FR" : "en-US";
+    const fmt = (d: Date) => d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
+    return `${fmt(start)} → ${fmt(now)}`;
+  };
+
   const exportAsCSV = async () => {
     setExportMenuVisible(false);
+    const rangeLine = `${translate("period")}: ${getDateRangeLabel()}\n\n`;
     const header = "Date,Type,Category,Description,Amount\n";
     const rows = filteredTransactions
       .map(
@@ -116,7 +135,7 @@ export default function TransactionsScreen() {
       )
       .join("\n");
     const summary = `\n\n${translate("totalIncome")},${totals.income}\n${translate("totalExpense")},${totals.expense}\n${translate("totalBalance")},${totals.balance}`;
-    const csv = header + rows + summary;
+    const csv = rangeLine + header + rows + summary;
 
     if (Platform.OS === "web") {
       const blob = new Blob([csv], { type: "text/csv" });
@@ -141,7 +160,7 @@ export default function TransactionsScreen() {
   const exportAsPDF = async () => {
     setExportMenuVisible(false);
     const businessName = state.profile.businessName || "Mon Business";
-    const dateLabel = dateRange === "all" ? translate("all") : translate(dateRange as any);
+    const dateRangeStr = getDateRangeLabel();
     const html = `
       <html>
       <head>
@@ -149,7 +168,8 @@ export default function TransactionsScreen() {
         <style>
           body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 30px; color: #333; }
           h1 { color: #0D9488; margin-bottom: 4px; }
-          .subtitle { color: #666; margin-bottom: 20px; }
+          .subtitle { color: #666; margin-bottom: 8px; }
+          .date-range { color: #0D9488; font-weight: bold; font-size: 14px; margin-bottom: 20px; }
           .summary { display: flex; gap: 20px; margin-bottom: 24px; }
           .summary-box { flex: 1; padding: 16px; border-radius: 10px; text-align: center; }
           .income-box { background: #ECFDF5; }
@@ -168,7 +188,8 @@ export default function TransactionsScreen() {
       </head>
       <body>
         <h1>${businessName}</h1>
-        <div class="subtitle">${translate("transactions")} — ${dateLabel} (${filteredTransactions.length} ${translate("transactions").toLowerCase()})</div>
+        <div class="subtitle">${translate("transactions")} (${filteredTransactions.length} ${translate("transactions").toLowerCase()})</div>
+        <div class="date-range">${translate("period")}: ${dateRangeStr}</div>
         <div class="summary">
           <div class="summary-box income-box">
             <div class="summary-label">${translate("totalIncome")}</div>

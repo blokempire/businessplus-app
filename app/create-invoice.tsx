@@ -5,7 +5,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
-import { formatCurrency, InvoiceItem, Contact, Product } from "@/lib/store";
+import { formatCurrency, InvoiceItem, Contact, Product, DiscountType } from "@/lib/store";
 
 export default function CreateInvoiceScreen() {
   const { state, translate, addInvoice } = useApp();
@@ -22,9 +22,15 @@ export default function CreateInvoiceScreen() {
   const [contactSearch, setContactSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
 
+  // Discount state
+  const [discountType, setDiscountType] = useState<DiscountType>("value");
+  const [discountInput, setDiscountInput] = useState("");
+
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const taxAmount = parseFloat(tax) || 0;
-  const total = subtotal + taxAmount;
+  const discountValue = parseFloat(discountInput) || 0;
+  const discountAmount = discountType === "percentage" ? (subtotal * discountValue) / 100 : discountValue;
+  const total = Math.max(0, subtotal - discountAmount + taxAmount);
 
   const filteredContacts = state.contacts.filter((c) =>
     c.name.toLowerCase().includes(contactSearch.toLowerCase())
@@ -89,7 +95,9 @@ export default function CreateInvoiceScreen() {
       taxAmount,
       note.trim(),
       dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      []
+      [],
+      discountType,
+      discountValue
     );
 
     Alert.alert(translate("success"), translate("invoiceCreated"), [
@@ -267,6 +275,48 @@ export default function CreateInvoiceScreen() {
           </View>
         )}
 
+        {/* Discount Section */}
+        <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 6 }}>{translate("discount")}</Text>
+        <View style={{ flexDirection: "row", marginBottom: 8, gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => setDiscountType("value")}
+            style={{
+              flex: 1,
+              backgroundColor: discountType === "value" ? colors.primary : colors.surface,
+              borderRadius: 10,
+              padding: 10,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: "600", color: discountType === "value" ? colors.background : colors.foreground }}>
+              {translate("fixedAmount")}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setDiscountType("percentage")}
+            style={{
+              flex: 1,
+              backgroundColor: discountType === "percentage" ? colors.primary : colors.surface,
+              borderRadius: 10,
+              padding: 10,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: "600", color: discountType === "percentage" ? colors.background : colors.foreground }}>
+              {translate("percentage")} (%)
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <TextInput
+          style={{ backgroundColor: colors.surface, borderRadius: 10, padding: 14, fontSize: 16, color: colors.foreground, marginBottom: 16 }}
+          placeholder={discountType === "percentage" ? "0 %" : "0"}
+          placeholderTextColor={colors.muted}
+          value={discountInput}
+          onChangeText={setDiscountInput}
+          keyboardType="numeric"
+          returnKeyType="done"
+        />
+
         {/* Tax */}
         <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 6 }}>{translate("taxAmount")}</Text>
         <TextInput
@@ -276,6 +326,7 @@ export default function CreateInvoiceScreen() {
           value={tax}
           onChangeText={setTax}
           keyboardType="numeric"
+          returnKeyType="done"
         />
 
         {/* Note */}
@@ -287,6 +338,7 @@ export default function CreateInvoiceScreen() {
           value={note}
           onChangeText={setNote}
           multiline
+          returnKeyType="done"
         />
 
         {/* Totals */}
@@ -295,6 +347,14 @@ export default function CreateInvoiceScreen() {
             <Text style={{ fontSize: 14, color: colors.muted }}>{translate("subtotal")}</Text>
             <Text style={{ fontSize: 14, color: colors.foreground }}>{formatCurrency(subtotal, state.profile.currency)}</Text>
           </View>
+          {discountAmount > 0 && (
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+              <Text style={{ fontSize: 14, color: colors.success }}>
+                {translate("discount")} {discountType === "percentage" ? `(${discountValue}%)` : ""}
+              </Text>
+              <Text style={{ fontSize: 14, color: colors.success }}>-{formatCurrency(discountAmount, state.profile.currency)}</Text>
+            </View>
+          )}
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
             <Text style={{ fontSize: 14, color: colors.muted }}>{translate("taxAmount")}</Text>
             <Text style={{ fontSize: 14, color: colors.foreground }}>{formatCurrency(taxAmount, state.profile.currency)}</Text>
