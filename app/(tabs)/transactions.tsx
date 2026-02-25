@@ -15,8 +15,7 @@ import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { formatCurrency, Transaction, TransactionType } from "@/lib/store";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
+import { ExportPreview } from "@/components/export-preview";
 
 type FilterType = "all" | "income" | "expense";
 type DateRange = "all" | "today" | "week" | "month" | "year";
@@ -28,6 +27,9 @@ export default function TransactionsScreen() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [exportMenuVisible, setExportMenuVisible] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
 
   const filteredTransactions = useMemo(() => {
     let txs = [...state.transactions].sort(
@@ -124,44 +126,28 @@ export default function TransactionsScreen() {
     return `${fmt(start)} → ${fmt(now)}`;
   };
 
-  const exportAsCSV = async () => {
-    setExportMenuVisible(false);
-    const rangeLine = `${translate("period")}: ${getDateRangeLabel()}\n\n`;
-    const header = "Date,Type,Category,Description,Amount\n";
+  const generateCSVHtml = () => {
+    const rangeLine = `${translate("period")}: ${getDateRangeLabel()}`;
     const rows = filteredTransactions
       .map(
-        (tx) =>
-          `${tx.date},${tx.type},${getCategoryName(tx.categoryId)},"${tx.description || ""}",${tx.type === "income" ? "+" : "-"}${tx.amount}`
+        (tx, i) =>
+          `<tr><td>${i + 1}</td><td>${new Date(tx.date).toLocaleDateString()}</td><td>${tx.type === "income" ? translate("income") : translate("expense")}</td><td>${getCategoryName(tx.categoryId)}</td><td>${tx.description || "-"}</td><td>${tx.type === "income" ? "+" : "-"}${formatCurrency(tx.amount, state.profile.currency)}</td></tr>`
       )
-      .join("\n");
-    const summary = `\n\n${translate("totalIncome")},${totals.income}\n${translate("totalExpense")},${totals.expense}\n${translate("totalBalance")},${totals.balance}`;
-    const csv = rangeLine + header + rows + summary;
-
-    if (Platform.OS === "web") {
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `transactions_${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      try {
-        const { uri } = await Print.printToFileAsync({
-          html: `<pre>${csv}</pre>`,
-        });
-        await Sharing.shareAsync(uri);
-      } catch (e) {
-        Alert.alert(translate("error"), String(e));
-      }
-    }
+      .join("");
+    return `<html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:20px}h2{color:#0D9488}table{width:100%;border-collapse:collapse}th{background:#0D9488;color:#fff;padding:8px;text-align:left;font-size:12px}td{padding:8px;border-bottom:1px solid #eee;font-size:12px}tr:nth-child(even){background:#f9f9f9}.summary{margin:16px 0;font-size:14px}</style></head><body><h2>${state.profile.businessName || "Mon Business"}</h2><p>${rangeLine}</p><p class="summary">${translate("totalIncome")}: +${formatCurrency(totals.income, state.profile.currency)} | ${translate("totalExpense")}: -${formatCurrency(totals.expense, state.profile.currency)} | ${translate("totalBalance")}: ${formatCurrency(totals.balance, state.profile.currency)}</p><table><tr><th>#</th><th>${translate("date")}</th><th>${translate("type")}</th><th>${translate("category")}</th><th>${translate("description")}</th><th>${translate("amount")}</th></tr>${rows}</table></body></html>`;
   };
 
-  const exportAsPDF = async () => {
+  const exportAsCSV = () => {
     setExportMenuVisible(false);
+    setPreviewTitle(`${translate("transactions")} (CSV)`);
+    setPreviewHtml(generateCSVHtml());
+    setPreviewVisible(true);
+  };
+
+  const generatePDFHtml = () => {
     const businessName = state.profile.businessName || "Mon Business";
     const dateRangeStr = getDateRangeLabel();
-    const html = `
+    return `
       <html>
       <head>
         <meta charset="utf-8" />
@@ -224,22 +210,13 @@ export default function TransactionsScreen() {
       </body>
       </html>
     `;
+  };
 
-    try {
-      if (Platform.OS === "web") {
-        const w = window.open("", "_blank");
-        if (w) {
-          w.document.write(html);
-          w.document.close();
-          w.print();
-        }
-      } else {
-        const { uri } = await Print.printToFileAsync({ html });
-        await Sharing.shareAsync(uri);
-      }
-    } catch (e) {
-      Alert.alert(translate("error"), String(e));
-    }
+  const exportAsPDF = () => {
+    setExportMenuVisible(false);
+    setPreviewTitle(`${translate("transactions")} (PDF)`);
+    setPreviewHtml(generatePDFHtml());
+    setPreviewVisible(true);
   };
 
   const renderTransaction = ({ item }: { item: Transaction }) => (
@@ -429,6 +406,17 @@ export default function TransactionsScreen() {
       >
         <IconSymbol name="plus.circle.fill" size={28} color="#FFF" />
       </Pressable>
+
+      {/* Export Preview */}
+      <ExportPreview
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
+        html={previewHtml}
+        title={previewTitle}
+        fileName={`transactions_${new Date().toISOString().split("T")[0]}.pdf`}
+        shareLabel={translate("sharePDF")}
+        printLabel={translate("printInvoice")}
+      />
 
       {/* Export Menu Modal */}
       <Modal visible={exportMenuVisible} transparent animationType="fade">

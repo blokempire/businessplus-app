@@ -1,6 +1,6 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import type { Express, Request, Response } from "express";
-import { getUserByOpenId, upsertUser } from "../db";
+import { getUserByOpenId, getUserByPhone, upsertUser } from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
@@ -56,7 +56,15 @@ function buildUserResponse(
     openId: user?.openId ?? null,
     name: user?.name ?? null,
     email: user?.email ?? null,
+    phone: (user as any)?.phone ?? null,
     loginMethod: user?.loginMethod ?? null,
+    role: (user as any)?.role ?? "user",
+    status: (user as any)?.status ?? "active",
+    subscriptionPlan: (user as any)?.subscriptionPlan ?? "free",
+    subscriptionActive: (user as any)?.subscriptionActive ?? false,
+    subscriptionEndDate: (user as any)?.subscriptionEndDate?.toISOString?.() ?? null,
+    companyId: (user as any)?.companyId ?? null,
+    companyRole: (user as any)?.companyRole ?? null,
     lastSignedIn: (user?.lastSignedIn ?? new Date()).toISOString(),
   };
 }
@@ -83,8 +91,6 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      // Redirect to the frontend URL (Expo web on port 8081)
-      // Cookie is set with parent domain so it works across both 3000 and 8081 subdomains
       const frontendUrl =
         process.env.EXPO_WEB_PREVIEW_URL ||
         process.env.EXPO_PACKAGER_PROXY_URL ||
@@ -134,7 +140,7 @@ export function registerOAuthRoutes(app: Express) {
     res.json({ success: true });
   });
 
-  // Get current authenticated user - works with both cookie (web) and Bearer token (mobile)
+  // Get current authenticated user
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     try {
       const user = await sdk.authenticateRequest(req);
@@ -146,14 +152,10 @@ export function registerOAuthRoutes(app: Express) {
   });
 
   // Establish session cookie from Bearer token
-  // Used by iframe preview: frontend receives token via postMessage, then calls this endpoint
-  // to get a proper Set-Cookie response from the backend (3000-xxx domain)
   app.post("/api/auth/session", async (req: Request, res: Response) => {
     try {
-      // Authenticate using Bearer token from Authorization header
       const user = await sdk.authenticateRequest(req);
 
-      // Get the token from the Authorization header to set as cookie
       const authHeader = req.headers.authorization || req.headers.Authorization;
       if (typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
         res.status(400).json({ error: "Bearer token required" });
@@ -161,7 +163,6 @@ export function registerOAuthRoutes(app: Express) {
       }
       const token = authHeader.slice("Bearer ".length).trim();
 
-      // Set cookie for this domain (3000-xxx)
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 

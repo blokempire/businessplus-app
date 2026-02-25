@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useRouter } from "expo-router";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Text,
   View,
@@ -19,6 +21,8 @@ import { Language } from "@/lib/i18n";
 export default function SettingsScreen() {
   const { state, updateProfile, setLanguage, addCategory, deleteCategory, translate } = useApp();
   const colors = useColors();
+  const router = useRouter();
+  const { user, logout, isAuthenticated } = useAuth();
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -207,6 +211,42 @@ export default function SettingsScreen() {
           label={translate("exportData")}
           onPress={handleExport}
         />
+
+        {/* Account & Subscription */}
+        <Text style={[styles.sectionTitle, { color: colors.muted }]}>{translate("subscription")}</Text>
+
+        <SettingRow
+          icon="creditcard.fill"
+          label={translate("subscription")}
+          value={translate("subscriptionPlans")}
+          onPress={() => router.push("/subscription" as any)}
+        />
+
+        <SettingRow
+          icon="building.2.fill"
+          label={translate("companyGroup")}
+          onPress={() => router.push("/company" as any)}
+        />
+
+        {isAuthenticated && (
+          <SettingRow
+            icon="rectangle.portrait.and.arrow.right"
+            label={translate("logout")}
+            onPress={() => {
+              Alert.alert(translate("confirm"), translate("logoutConfirm"), [
+                { text: translate("cancel"), style: "cancel" },
+                {
+                  text: translate("logout"),
+                  style: "destructive",
+                  onPress: async () => {
+                    await logout();
+                    router.replace("/login" as any);
+                  },
+                },
+              ]);
+            }}
+          />
+        )}
 
         {/* About */}
         <Text style={[styles.sectionTitle, { color: colors.muted }]}>{translate("about")}</Text>

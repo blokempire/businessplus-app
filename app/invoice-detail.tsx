@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View, TouchableOpacity, ScrollView, Alert, Platform } from "react-native";
+import { Text, View, TouchableOpacity, ScrollView, Alert, Platform, Modal, TextInput, KeyboardAvoidingView, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as Print from "expo-print";
@@ -10,12 +10,17 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { formatCurrency } from "@/lib/store";
+import { ExportPreview } from "@/components/export-preview";
 
 export default function InvoiceDetailScreen() {
-  const { state, translate, updateInvoice, deleteInvoice, changeInvoiceStatus } = useApp();
+  const { state, translate, updateInvoice, deleteInvoice, changeInvoiceStatus, makePartialPayment } = useApp();
   const colors = useColors();
   const router = useRouter();
   const params = useLocalSearchParams<{ invoiceId: string }>();
+
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   const invoice = state.invoices.find((inv) => inv.id === params.invoiceId);
   if (!invoice) {
@@ -27,6 +32,7 @@ export default function InvoiceDetailScreen() {
   }
 
   const currency = state.profile.currency;
+  const remaining = invoice.total - (invoice.paidAmount || 0);
 
   const handleStatusChange = () => {
     const options: { text: string; onPress?: () => void; style?: "cancel" | "destructive" }[] = [];
@@ -49,6 +55,16 @@ export default function InvoiceDetailScreen() {
         },
       });
     }
+    // Partial payment option
+    if (invoice.status !== "paid" && invoice.status !== "cancelled") {
+      options.push({
+        text: translate("makePartialPayment"),
+        onPress: () => {
+          setPaymentAmount("");
+          setPaymentModalVisible(true);
+        },
+      });
+    }
     if (invoice.status !== "cancelled") {
       options.push({
         text: translate("markAsCancelled"),
@@ -62,6 +78,21 @@ export default function InvoiceDetailScreen() {
     options.push({ text: translate("cancel"), style: "cancel" });
 
     Alert.alert(translate("changeStatus"), "", options);
+  };
+
+  const handlePartialPayment = () => {
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert(translate("error"), translate("invalidPaymentAmount"));
+      return;
+    }
+    if (amount > remaining) {
+      Alert.alert(translate("error"), translate("paymentExceedsBalance"));
+      return;
+    }
+    makePartialPayment(invoice.id, amount);
+    setPaymentModalVisible(false);
+    Alert.alert(translate("success"), translate("paymentRecorded"));
   };
 
   const generateInvoiceHTML = () => {
@@ -82,6 +113,16 @@ export default function InvoiceDetailScreen() {
     <div class="row" style="color:#22C55E;">
       <span>${translate("discount")}${invoice.discountType === "percentage" ? ` (${invoice.discountValue}%)` : ""}:</span>
       <span>-${formatCurrency(invoice.discountAmount, currency)}</span>
+    </div>` : "";
+
+    const paidRow = (invoice.paidAmount && invoice.paidAmount > 0) ? `
+    <div class="row" style="color:#22C55E;">
+      <span>${translate("amountPaid")}:</span>
+      <span>-${formatCurrency(invoice.paidAmount, currency)}</span>
+    </div>
+    <div class="row" style="font-weight:600;">
+      <span>${translate("amountRemaining")}:</span>
+      <span>${formatCurrency(Math.max(0, invoice.total - invoice.paidAmount), currency)}</span>
     </div>` : "";
 
     return `
@@ -169,6 +210,7 @@ export default function InvoiceDetailScreen() {
       <span>${translate("invoiceTotal")}:</span>
       <span>${formatCurrency(invoice.total, currency)}</span>
     </div>
+    ${paidRow}
   </div>
 
   ${invoice.note ? `<div class="note"><h4>${translate("invoiceNote")}</h4><p>${invoice.note}</p></div>` : ""}
@@ -180,21 +222,8 @@ export default function InvoiceDetailScreen() {
 </html>`;
   };
 
-  const handlePrint = async () => {
-    try {
-      await Print.printAsync({ html: generateInvoiceHTML() });
-    } catch (e) {
-      console.error("Print error:", e);
-    }
-  };
-
-  const handleSharePDF = async () => {
-    try {
-      const { uri } = await Print.printToFileAsync({ html: generateInvoiceHTML() });
-      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: `${invoice.invoiceNumber}.pdf` });
-    } catch (e) {
-      console.error("Share PDF error:", e);
-    }
+  const handlePreview = () => {
+    setPreviewVisible(true);
   };
 
   const handleAddPhoto = async () => {
@@ -269,7 +298,6 @@ export default function InvoiceDetailScreen() {
             <Text style={{ fontSize: 14, fontWeight: "600", color: statusColor }}>{statusLabel}</Text>
             <IconSymbol name="chevron.right" size={14} color={statusColor} style={{ marginLeft: 6, transform: [{ rotate: "90deg" }] }} />
           </View>
-          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>{translate("changeStatus")}</Text>
         </TouchableOpacity>
 
         {/* Invoice Info */}
@@ -329,6 +357,25 @@ export default function InvoiceDetailScreen() {
             <Text style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}>{translate("invoiceTotal")}</Text>
             <Text style={{ fontSize: 18, fontWeight: "700", color: colors.primary }}>{formatCurrency(invoice.total, currency)}</Text>
           </View>
+
+          {/* Payment progress */}
+          {(invoice.paidAmount || 0) > 0 && (
+            <View style={{ marginTop: 12 }}>
+              <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 10 }} />
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                <Text style={{ color: colors.success, fontWeight: "500" }}>{translate("amountPaid")}</Text>
+                <Text style={{ color: colors.success, fontWeight: "600" }}>{formatCurrency(invoice.paidAmount, currency)}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: remaining > 0 ? colors.warning : colors.success, fontWeight: "500" }}>{translate("amountRemaining")}</Text>
+                <Text style={{ color: remaining > 0 ? colors.warning : colors.success, fontWeight: "600" }}>{formatCurrency(Math.max(0, remaining), currency)}</Text>
+              </View>
+              {/* Progress bar */}
+              <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, marginTop: 10 }}>
+                <View style={{ height: 6, backgroundColor: colors.success, borderRadius: 3, width: `${Math.min(100, ((invoice.paidAmount || 0) / invoice.total) * 100)}%` }} />
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Note */}
@@ -386,22 +433,129 @@ export default function InvoiceDetailScreen() {
             <Text style={{ color: statusColor, fontWeight: "600", marginLeft: 8, fontSize: 15 }}>{translate("changeStatus")}</Text>
           </TouchableOpacity>
 
+          {/* Partial Payment Button — only if not fully paid or cancelled */}
+          {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+            <TouchableOpacity
+              onPress={() => { setPaymentAmount(""); setPaymentModalVisible(true); }}
+              style={{ backgroundColor: colors.warning + "20", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
+            >
+              <IconSymbol name="creditcard.fill" size={20} color={colors.warning} />
+              <Text style={{ color: colors.warning, fontWeight: "600", marginLeft: 8, fontSize: 15 }}>{translate("makePartialPayment")}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Preview PDF before sharing */}
           <TouchableOpacity
-            onPress={handleSharePDF}
+            onPress={handlePreview}
             style={{ backgroundColor: colors.primary, borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
           >
-            <IconSymbol name="square.and.arrow.up" size={20} color={colors.background} />
-            <Text style={{ color: colors.background, fontWeight: "600", marginLeft: 8, fontSize: 15 }}>{translate("sharePDF")}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handlePrint}
-            style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
-          >
-            <IconSymbol name="printer.fill" size={20} color={colors.foreground} />
-            <Text style={{ color: colors.foreground, fontWeight: "600", marginLeft: 8, fontSize: 15 }}>{translate("printInvoice")}</Text>
+            <IconSymbol name="doc.text" size={20} color={colors.background} />
+            <Text style={{ color: colors.background, fontWeight: "600", marginLeft: 8, fontSize: 15 }}>{translate("previewBeforeShare")}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Export Preview Modal */}
+      <ExportPreview
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
+        html={generateInvoiceHTML()}
+        title={invoice.invoiceNumber}
+        fileName={`${invoice.invoiceNumber}.pdf`}
+        shareLabel={translate("sharePDF")}
+        printLabel={translate("printInvoice")}
+      />
+
+      {/* Partial Payment Modal */}
+      <Modal visible={paymentModalVisible} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={s.modalOverlay}>
+          <View style={[s.paymentSheet, { backgroundColor: colors.background }]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <Text style={{ fontSize: 20, fontWeight: "700", color: colors.foreground }}>{translate("makePartialPayment")}</Text>
+              <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
+                <IconSymbol name="xmark.circle.fill" size={28} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Remaining balance info */}
+            <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                <Text style={{ color: colors.muted }}>{translate("invoiceTotal")}</Text>
+                <Text style={{ color: colors.foreground, fontWeight: "600" }}>{formatCurrency(invoice.total, currency)}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                <Text style={{ color: colors.success }}>{translate("amountPaid")}</Text>
+                <Text style={{ color: colors.success, fontWeight: "600" }}>{formatCurrency(invoice.paidAmount || 0, currency)}</Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 6 }} />
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: colors.warning, fontWeight: "600" }}>{translate("amountRemaining")}</Text>
+                <Text style={{ color: colors.warning, fontWeight: "700", fontSize: 18 }}>{formatCurrency(remaining, currency)}</Text>
+              </View>
+            </View>
+
+            {/* Payment amount input */}
+            <Text style={{ fontSize: 14, fontWeight: "500", color: colors.foreground, marginBottom: 6 }}>{translate("enterPaymentAmount")}</Text>
+            <TextInput
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: 12,
+                padding: 14,
+                fontSize: 20,
+                fontWeight: "700",
+                color: colors.foreground,
+                textAlign: "center",
+                marginBottom: 20,
+              }}
+              keyboardType="numeric"
+              placeholder="0.00"
+              placeholderTextColor={colors.muted}
+              value={paymentAmount}
+              onChangeText={setPaymentAmount}
+              returnKeyType="done"
+              autoFocus
+            />
+
+            {/* Quick amount buttons */}
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
+              {[0.25, 0.5, 0.75, 1].map((fraction) => {
+                const quickAmount = Math.round(remaining * fraction * 100) / 100;
+                return (
+                  <TouchableOpacity
+                    key={fraction}
+                    onPress={() => setPaymentAmount(quickAmount.toString())}
+                    style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 10, paddingVertical: 10, alignItems: "center" }}
+                  >
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{Math.round(fraction * 100)}%</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>{formatCurrency(quickAmount, currency)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              onPress={handlePartialPayment}
+              style={{ backgroundColor: colors.primary, borderRadius: 12, padding: 16, alignItems: "center" }}
+            >
+              <Text style={{ color: colors.background, fontWeight: "700", fontSize: 16 }}>{translate("recordPayment")}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScreenContainer>
   );
 }
+
+const s = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  paymentSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+});

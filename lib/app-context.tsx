@@ -60,6 +60,7 @@ type Action =
   | { type: "UPDATE_CONTACT"; payload: Contact }
   | { type: "DELETE_CONTACT"; payload: string }
   | { type: "ADD_DEBT_ENTRY"; payload: DebtEntry }
+  | { type: "UPDATE_DEBT_ENTRY"; payload: DebtEntry }
   | { type: "DELETE_DEBT_ENTRY"; payload: string }
   | { type: "CLEAR_CONTACT_DEBTS"; payload: string }
   | { type: "ADD_PRODUCT"; payload: Product }
@@ -101,6 +102,8 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case "ADD_DEBT_ENTRY":
       return { ...state, debtEntries: [action.payload, ...state.debtEntries] };
+    case "UPDATE_DEBT_ENTRY":
+      return { ...state, debtEntries: state.debtEntries.map((e) => e.id === action.payload.id ? action.payload : e) };
     case "DELETE_DEBT_ENTRY":
       return { ...state, debtEntries: state.debtEntries.filter((e) => e.id !== action.payload) };
     case "CLEAR_CONTACT_DEBTS":
@@ -157,6 +160,7 @@ interface AppContextType {
   deleteProduct: (id: string) => void;
   addInvoice: (contactId: string, contactName: string, items: InvoiceItem[], tax: number, note: string, dueDate: string, photoUris: string[], discountType?: import("./store").DiscountType, discountValue?: number) => Invoice;
   changeInvoiceStatus: (invoiceId: string, newStatus: InvoiceStatus) => void;
+  makePartialPayment: (invoiceId: string, paymentAmount: number) => void;
   updateInvoice: (invoice: Invoice) => void;
   deleteInvoice: (id: string) => void;
 }
@@ -388,6 +392,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.invoices, state.debtEntries]);
 
+  // Make partial payment on an invoice — reduces debt and updates paidAmount
+  const makePartialPayment = useCallback((invoiceId: string, paymentAmount: number) => {
+    const invoice = state.invoices.find((inv) => inv.id === invoiceId);
+    if (!invoice) return;
+
+    const newPaidAmount = (invoice.paidAmount || 0) + paymentAmount;
+    const remaining = invoice.total - newPaidAmount;
+    const newStatus: InvoiceStatus = remaining <= 0 ? "paid" : "partial";
+
+    const updatedInvoice = { ...invoice, paidAmount: newPaidAmount, status: newStatus };
+    dispatch({ type: "UPDATE_INVOICE", payload: updatedInvoice });
+
+    // Update the debt entry for this invoice
+    const debtDesc = `Invoice ${invoice.invoiceNumber}`;
+    const matchingDebt = state.debtEntries.find(
+      (e) => e.contactId === invoice.contactId && e.description === debtDesc
+    );
+
+    if (remaining <= 0) {
+      // Fully paid — remove debt
+      if (matchingDebt) {
+        dispatch({ type: "DELETE_DEBT_ENTRY", payload: matchingDebt.id });
+      }
+    } else if (matchingDebt) {
+      // Partially paid — reduce debt amount
+      const updatedDebt = { ...matchingDebt, amount: remaining };
+      dispatch({ type: "UPDATE_DEBT_ENTRY", payload: updatedDebt });
+    }
+
+    // Record the payment as an income transaction
+    const tx: Transaction = {
+      id: generateId(),
+      type: "income",
+      amount: paymentAmount,
+      categoryId: "settlement",
+      description: `Payment: ${invoice.invoiceNumber} (${invoice.contactName})`,
+      date: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    dispatch({ type: "ADD_TRANSACTION", payload: tx });
+  }, [state.invoices, state.debtEntries]);
+
   return (
     <AppContext.Provider
       value={{
@@ -398,7 +444,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addContact, updateContact, deleteContact,
         addDebtEntry, deleteDebtEntry, settleContact,
         addProduct, updateProduct, deleteProduct,
-        addInvoice, updateInvoice, deleteInvoice, changeInvoiceStatus,
+        addInvoice, updateInvoice, deleteInvoice, changeInvoiceStatus, makePartialPayment,
       }}
     >
       {children}

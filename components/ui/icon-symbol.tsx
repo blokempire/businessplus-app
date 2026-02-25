@@ -66,6 +66,20 @@ const MAPPING = {
   "minus": "remove",
   "exclamationmark.triangle.fill": "warning",
   "doc.richtext": "article",
+  "lock.fill": "lock",
+  "lock.open.fill": "lock-open",
+  "key.fill": "vpn-key",
+  "crown.fill": "workspace-premium",
+  "star.fill": "star",
+  "clock.fill": "schedule",
+  "envelope.fill": "email",
+  "xmark.circle.fill": "cancel",
+  "arrow.clockwise": "refresh",
+  "person.3.fill": "groups",
+  "link": "link",
+  "qrcode": "qr-code",
+  "message.fill": "chat",
+  "rectangle.portrait.and.arrow.right": "logout",
 } as IconMapping;
 
 export function IconSymbol({

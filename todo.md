@@ -84,3 +84,22 @@
 - [x] Add invoice discount field (supports both fixed value and percentage)
 - [x] Allow invoice status change directly on invoice (paid, cancelled, pending)
 - [x] When invoice is unpaid, auto-add as debt for the contact name (auto-debt on create, remove on paid/cancel)
+- [x] Add export preview before sharing (transactions, stock, invoices, contact records)
+- [x] Add partial invoice payment directly from invoice detail
+- [x] Partial payment reduces contact's debt by paid amount
+- [x] Add "partial" invoice status when partially paid
+- [x] Track paid amount vs remaining on invoice
+- [x] Replace OAuth with phone number + 4-digit PIN authentication
+- [x] Pre-recognize 056185603 as admin account
+- [x] Build phone+PIN login screen
+- [x] Build phone+PIN register screen
+- [x] Add multi-user company/shop accounts (main user + up to 5 invited members)
+- [x] Build company management screen with role-based invitations
+- [x] Add subscription plans: Free 7-day trial, Solo 10,000 XAF/year, Team 20,000 XAF/year
+- [x] Build subscription screen with plan selection
+- [x] Add WhatsApp payment flow (+242056184503) with pre-formatted message
+- [x] Auto-expire subscription after 1 year, require renewal
+- [x] Update admin panel with subscription management (grant/revoke access for 1 year)
+- [x] Add subscription expiry check on app launch
+- [x] Update database schema for phone auth, subscriptions, and company groups
+- [x] Add i18n translations for all new auth/subscription/team features

@@ -99,6 +99,8 @@ export default function RootLayout() {
             <Stack.Screen name="transaction-detail" options={{ presentation: "card" }} />
             <Stack.Screen name="reports" options={{ presentation: "card" }} />
             <Stack.Screen name="admin" options={{ presentation: "card" }} />
+            <Stack.Screen name="subscription" options={{ presentation: "card" }} />
+            <Stack.Screen name="company" options={{ presentation: "card" }} />
             <Stack.Screen name="settings" options={{ presentation: "card" }} />
             <Stack.Screen name="oauth/callback" />
           </Stack>
