@@ -134,7 +134,7 @@ export default function TransactionsScreen() {
           `<tr><td>${i + 1}</td><td>${new Date(tx.date).toLocaleDateString()}</td><td>${tx.type === "income" ? translate("income") : translate("expense")}</td><td>${getCategoryName(tx.categoryId)}</td><td>${tx.description || "-"}</td><td>${tx.type === "income" ? "+" : "-"}${formatCurrency(tx.amount, state.profile.currency)}</td></tr>`
       )
       .join("");
-    return `<html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:20px}h2{color:#0D9488}table{width:100%;border-collapse:collapse}th{background:#0D9488;color:#fff;padding:8px;text-align:left;font-size:12px}td{padding:8px;border-bottom:1px solid #eee;font-size:12px}tr:nth-child(even){background:#f9f9f9}.summary{margin:16px 0;font-size:14px}</style></head><body><h2>${state.profile.businessName || "Mon Business"}</h2><p>${rangeLine}</p><p class="summary">${translate("totalIncome")}: +${formatCurrency(totals.income, state.profile.currency)} | ${translate("totalExpense")}: -${formatCurrency(totals.expense, state.profile.currency)} | ${translate("totalBalance")}: ${formatCurrency(totals.balance, state.profile.currency)}</p><table><tr><th>#</th><th>${translate("date")}</th><th>${translate("type")}</th><th>${translate("category")}</th><th>${translate("description")}</th><th>${translate("amount")}</th></tr>${rows}</table></body></html>`;
+    return `<html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:20px}h2{color:#0D9488}table{width:100%;border-collapse:collapse}th{background:#0D9488;color:#fff;padding:8px;text-align:left;font-size:12px}td{padding:8px;border-bottom:1px solid #eee;font-size:12px}tr:nth-child(even){background:#f9f9f9}.summary{margin:16px 0;font-size:14px}</style></head><body><h2>${state.profile.businessName || "Business+"}</h2><p>${rangeLine}</p><p class="summary">${translate("totalIncome")}: +${formatCurrency(totals.income, state.profile.currency)} | ${translate("totalExpense")}: -${formatCurrency(totals.expense, state.profile.currency)} | ${translate("totalBalance")}: ${formatCurrency(totals.balance, state.profile.currency)}</p><table><tr><th>#</th><th>${translate("date")}</th><th>${translate("type")}</th><th>${translate("category")}</th><th>${translate("description")}</th><th>${translate("amount")}</th></tr>${rows}</table></body></html>`;
   };
 
   const exportAsCSV = () => {
@@ -145,7 +145,7 @@ export default function TransactionsScreen() {
   };
 
   const generatePDFHtml = () => {
-    const businessName = state.profile.businessName || "Mon Business";
+    const businessName = state.profile.businessName || "Business+";
     const dateRangeStr = getDateRangeLabel();
     return `
       <html>

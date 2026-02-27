@@ -9,6 +9,7 @@ import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AppProvider } from "@/lib/app-context";
+import { AuthGate } from "@/components/auth-gate";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -24,7 +25,7 @@ const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
 export const unstable_settings = {
-  anchor: "(tabs)",
+  anchor: "login",
 };
 
 export default function RootLayout() {
@@ -87,12 +88,13 @@ export default function RootLayout() {
           {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
+          <AuthGate />
           <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="login" options={{ presentation: "fullScreenModal" }} />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="add-transaction" options={{ presentation: "modal" }} />
             <Stack.Screen name="contact-detail" options={{ presentation: "card" }} />
             <Stack.Screen name="add-debt-entry" options={{ presentation: "modal" }} />
-            <Stack.Screen name="login" options={{ presentation: "fullScreenModal" }} />
             <Stack.Screen name="add-product" options={{ presentation: "modal" }} />
             <Stack.Screen name="create-invoice" options={{ presentation: "modal" }} />
             <Stack.Screen name="invoice-detail" options={{ presentation: "card" }} />

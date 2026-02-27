@@ -59,7 +59,7 @@ export default function StockScreen() {
           `<tr><td>${i + 1}</td><td>${p.name}</td><td>${formatCurrency(p.price, state.profile.currency)}</td><td>${p.quantity}</td><td>${p.unit}</td><td>${formatCurrency(p.price * p.quantity, state.profile.currency)}</td><td>${getStockStatusText(p.quantity)}</td></tr>`
       )
       .join("");
-    return `<html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:20px}h2{color:#0D9488}table{width:100%;border-collapse:collapse}th{background:#0D9488;color:#fff;padding:8px;text-align:left;font-size:12px}td{padding:8px;border-bottom:1px solid #eee;font-size:12px}tr:nth-child(even){background:#f9f9f9}.summary{margin:16px 0;font-size:14px}</style></head><body><h2>${state.profile.businessName || "Mon Business"}</h2><p>${translate("inventoryReport")} — ${filteredProducts.length} ${translate("products").toLowerCase()}</p><p class="summary">${translate("totalProducts")}: ${totalItems} | ${translate("stockValue")}: ${formatCurrency(totalValue, state.profile.currency)}</p><table><tr><th>#</th><th>${translate("productName")}</th><th>${translate("productPrice")}</th><th>${translate("stock")}</th><th>Unit</th><th>${translate("stockValue")}</th><th>Status</th></tr>${rows}</table></body></html>`;
+    return `<html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:20px}h2{color:#0D9488}table{width:100%;border-collapse:collapse}th{background:#0D9488;color:#fff;padding:8px;text-align:left;font-size:12px}td{padding:8px;border-bottom:1px solid #eee;font-size:12px}tr:nth-child(even){background:#f9f9f9}.summary{margin:16px 0;font-size:14px}</style></head><body><h2>${state.profile.businessName || "Business+"}</h2><p>${translate("inventoryReport")} — ${filteredProducts.length} ${translate("products").toLowerCase()}</p><p class="summary">${translate("totalProducts")}: ${totalItems} | ${translate("stockValue")}: ${formatCurrency(totalValue, state.profile.currency)}</p><table><tr><th>#</th><th>${translate("productName")}</th><th>${translate("productPrice")}</th><th>${translate("stock")}</th><th>Unit</th><th>${translate("stockValue")}</th><th>Status</th></tr>${rows}</table></body></html>`;
   };
 
   const exportAsCSV = () => {
@@ -74,7 +74,7 @@ export default function StockScreen() {
   };
 
   const generatePDFHtml = () => {
-    const businessName = state.profile.businessName || "Mon Business";
+    const businessName = state.profile.businessName || "Business+";
     const outOfStock = filteredProducts.filter((p) => p.quantity === 0).length;
     const lowStock = filteredProducts.filter((p) => p.quantity > 0 && p.quantity <= 5).length;
     const inStock = filteredProducts.filter((p) => p.quantity > 5).length;

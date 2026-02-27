@@ -248,7 +248,7 @@ export default function ContactDetailScreen() {
         <div class="summary-item"><div class="label">${translate("netBalance")}</div><div class="value" style="color:${netBalance >= 0 ? "#22C55E" : "#EF4444"}">${netBalance >= 0 ? "+" : "-"}${formatCurrency(Math.abs(netBalance), currency)}</div></div>
       </div>
       <table><thead><tr><th>${translate("date")}</th><th>${translate("description")}</th><th>${translate("amount")}</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="footer">${state.profile.businessName || "Mon Business"} · ${new Date().toLocaleDateString()}</div>
+      <div class="footer">${state.profile.businessName || "Business+"} · ${new Date().toLocaleDateString()}</div>
     </body></html>`;
 
     try {

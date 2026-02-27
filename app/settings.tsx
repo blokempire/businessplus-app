@@ -29,6 +29,7 @@ export default function SettingsScreen() {
   const [newCatType, setNewCatType] = useState<"income" | "expense">("expense");
   const [editingName, setEditingName] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState(false);
+  const [currencySearch, setCurrencySearch] = useState("");
   const [nameInput, setNameInput] = useState(state.profile.name);
   const [businessInput, setBusinessInput] = useState(state.profile.businessName);
 
@@ -268,30 +269,49 @@ export default function SettingsScreen() {
                 <IconSymbol name="xmark" size={24} color={colors.foreground} />
               </Pressable>
             </View>
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+              placeholder={translate("search") + "..."}
+              placeholderTextColor={colors.muted}
+              value={currencySearch}
+              onChangeText={setCurrencySearch}
+              returnKeyType="done"
+            />
             <ScrollView>
-              {CURRENCIES.map((cur) => (
-                <Pressable
-                  key={cur.code}
-                  onPress={() => {
-                    updateProfile({ currency: cur.code });
-                    setShowCurrencyModal(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.currencyRow,
-                    {
-                      backgroundColor:
-                        state.profile.currency === cur.code ? colors.primary + "15" : "transparent",
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.currencyCode, { color: colors.foreground }]}>{cur.code}</Text>
-                  <Text style={[styles.currencyName, { color: colors.muted }]}>{cur.name}</Text>
-                  {state.profile.currency === cur.code && (
-                    <IconSymbol name="checkmark" size={20} color={colors.primary} />
-                  )}
-                </Pressable>
-              ))}
+              {(() => {
+                const filtered = CURRENCIES.filter((cur) =>
+                  !currencySearch || cur.code.toLowerCase().includes(currencySearch.toLowerCase()) || cur.name.toLowerCase().includes(currencySearch.toLowerCase()) || (cur.region && cur.region.toLowerCase().includes(currencySearch.toLowerCase()))
+                );
+                const regions = [...new Set(filtered.map((c) => c.region || "Other"))];
+                return regions.map((region) => (
+                  <View key={region}>
+                    <Text style={[styles.regionHeader, { color: colors.muted }]}>{region}</Text>
+                    {filtered.filter((c) => (c.region || "Other") === region).map((cur) => (
+                      <Pressable
+                        key={cur.code}
+                        onPress={() => {
+                          updateProfile({ currency: cur.code });
+                          setShowCurrencyModal(false);
+                          setCurrencySearch("");
+                        }}
+                        style={({ pressed }) => [
+                          styles.currencyRow,
+                          {
+                            backgroundColor: state.profile.currency === cur.code ? colors.primary + "15" : "transparent",
+                            opacity: pressed ? 0.7 : 1,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.currencyCode, { color: colors.foreground }]}>{cur.code}</Text>
+                        <Text style={[styles.currencyName, { color: colors.muted }]}>{cur.name}</Text>
+                        {state.profile.currency === cur.code && (
+                          <IconSymbol name="checkmark" size={20} color={colors.primary} />
+                        )}
+                      </Pressable>
+                    ))}
+                  </View>
+                ));
+              })()}
             </ScrollView>
           </View>
         </View>
@@ -514,6 +534,24 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
+  },
+  searchInput: {
+    fontSize: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginHorizontal: 20,
+    marginBottom: 8,
+  },
+  regionHeader: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase" as any,
+    letterSpacing: 1,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 6,
   },
   currencyRow: {
     flexDirection: "row",

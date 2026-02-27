@@ -24,7 +24,7 @@ describe("generateId", () => {
 
 describe("formatCurrency", () => {
   it("should format CFA currency", () => {
-    expect(formatCurrency(1000, "XOF")).toBe("1,000 CFA");
+    expect(formatCurrency(1000, "XOF")).toBe("1,000 FCFA");
   });
 
   it("should format Nigerian Naira", () => {
@@ -40,7 +40,7 @@ describe("formatCurrency", () => {
   });
 
   it("should handle zero", () => {
-    expect(formatCurrency(0, "XOF")).toBe("0 CFA");
+    expect(formatCurrency(0, "XOF")).toBe("0 FCFA");
   });
 
   it("should handle negative amounts (uses absolute value)", () => {

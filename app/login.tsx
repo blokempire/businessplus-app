@@ -8,10 +8,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import * as Auth from "@/lib/_core/auth";
+import { detectCurrencyFromPhone, detectLanguageFromPhone } from "@/lib/store";
 
 export default function LoginScreen() {
   const colors = useColors();
-  const { translate } = useApp();
+  const { translate, updateProfile, setLanguage } = useApp();
   const router = useRouter();
   const { isAuthenticated, loading: authLoading, refresh } = useAuth();
 
@@ -89,6 +90,11 @@ export default function LoginScreen() {
         loginMethod: "phone",
         lastSignedIn: new Date(),
       });
+      // Auto-detect currency and language from phone number
+      const detectedCurrency = detectCurrencyFromPhone(phone.trim());
+      const detectedLanguage = detectLanguageFromPhone(phone.trim());
+      updateProfile({ currency: detectedCurrency });
+      setLanguage(detectedLanguage);
       await refresh();
       router.replace("/(tabs)" as any);
     } catch (err: any) {
@@ -122,7 +128,7 @@ export default function LoginScreen() {
               <View style={styles.logoContainer}>
                 <IconSymbol name="dollarsign.circle" size={72} color="#FFFFFF" />
               </View>
-              <Text style={styles.appName}>Mon Business</Text>
+              <Text style={styles.appName}>Business+</Text>
               <Text style={styles.tagline}>{translate("appDescription")}</Text>
             </View>
 

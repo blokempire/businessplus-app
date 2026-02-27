@@ -271,14 +271,33 @@ export function formatCurrency(amount: number, currency: string): string {
     maximumFractionDigits: 0,
   });
   const symbols: Record<string, string> = {
-    XOF: "CFA",
-    XAF: "CFA",
+    XOF: "FCFA",
+    XAF: "FCFA",
     NGN: "₦",
     GHS: "GH₵",
     KES: "KSh",
     USD: "$",
     EUR: "€",
     GBP: "£",
+    ZAR: "R",
+    MAD: "MAD",
+    TND: "DT",
+    EGP: "E£",
+    TZS: "TSh",
+    UGX: "USh",
+    RWF: "FRw",
+    CDF: "FC",
+    AOA: "Kz",
+    MZN: "MT",
+    BWP: "P",
+    ETB: "Br",
+    CNY: "¥",
+    JPY: "¥",
+    INR: "₹",
+    BRL: "R$",
+    CAD: "C$",
+    AUD: "A$",
+    CHF: "CHF",
   };
   const symbol = symbols[currency] || currency;
   return `${formatted} ${symbol}`;
@@ -349,12 +368,113 @@ export function calculateContactBalance(entries: DebtEntry[], contactId: string)
 }
 
 export const CURRENCIES = [
-  { code: "XOF", name: "CFA Franc (BCEAO)" },
-  { code: "XAF", name: "CFA Franc (BEAC)" },
-  { code: "NGN", name: "Nigerian Naira" },
-  { code: "GHS", name: "Ghanaian Cedi" },
-  { code: "KES", name: "Kenyan Shilling" },
-  { code: "USD", name: "US Dollar" },
-  { code: "EUR", name: "Euro" },
-  { code: "GBP", name: "British Pound" },
+  // Central & West Africa
+  { code: "XAF", name: "CFA Franc BEAC", region: "Central Africa" },
+  { code: "XOF", name: "CFA Franc BCEAO", region: "West Africa" },
+  { code: "CDF", name: "Congolese Franc", region: "Central Africa" },
+  { code: "NGN", name: "Nigerian Naira", region: "West Africa" },
+  { code: "GHS", name: "Ghanaian Cedi", region: "West Africa" },
+  // East Africa
+  { code: "KES", name: "Kenyan Shilling", region: "East Africa" },
+  { code: "TZS", name: "Tanzanian Shilling", region: "East Africa" },
+  { code: "UGX", name: "Ugandan Shilling", region: "East Africa" },
+  { code: "RWF", name: "Rwandan Franc", region: "East Africa" },
+  { code: "ETB", name: "Ethiopian Birr", region: "East Africa" },
+  // Southern Africa
+  { code: "ZAR", name: "South African Rand", region: "Southern Africa" },
+  { code: "BWP", name: "Botswana Pula", region: "Southern Africa" },
+  { code: "MZN", name: "Mozambican Metical", region: "Southern Africa" },
+  { code: "AOA", name: "Angolan Kwanza", region: "Southern Africa" },
+  // North Africa
+  { code: "MAD", name: "Moroccan Dirham", region: "North Africa" },
+  { code: "TND", name: "Tunisian Dinar", region: "North Africa" },
+  { code: "EGP", name: "Egyptian Pound", region: "North Africa" },
+  // International
+  { code: "USD", name: "US Dollar", region: "International" },
+  { code: "EUR", name: "Euro", region: "International" },
+  { code: "GBP", name: "British Pound", region: "International" },
+  { code: "CAD", name: "Canadian Dollar", region: "International" },
+  { code: "AUD", name: "Australian Dollar", region: "International" },
+  { code: "CHF", name: "Swiss Franc", region: "International" },
+  // Asia
+  { code: "CNY", name: "Chinese Yuan", region: "Asia" },
+  { code: "JPY", name: "Japanese Yen", region: "Asia" },
+  { code: "INR", name: "Indian Rupee", region: "Asia" },
+  // Americas
+  { code: "BRL", name: "Brazilian Real", region: "Americas" },
 ];
+
+/**
+ * Map phone country codes to default currency.
+ * Used to auto-detect currency based on user's phone number.
+ */
+export const PHONE_PREFIX_TO_CURRENCY: Record<string, string> = {
+  "+242": "XAF",   // Congo-Brazzaville
+  "+237": "XAF",   // Cameroon
+  "+241": "XAF",   // Gabon
+  "+235": "XAF",   // Chad
+  "+236": "XAF",   // Central African Republic
+  "+240": "XAF",   // Equatorial Guinea
+  "+225": "XOF",   // Ivory Coast
+  "+221": "XOF",   // Senegal
+  "+223": "XOF",   // Mali
+  "+226": "XOF",   // Burkina Faso
+  "+227": "XOF",   // Niger
+  "+228": "XOF",   // Togo
+  "+229": "XOF",   // Benin
+  "+245": "XOF",   // Guinea-Bissau
+  "+234": "NGN",   // Nigeria
+  "+233": "GHS",   // Ghana
+  "+254": "KES",   // Kenya
+  "+255": "TZS",   // Tanzania
+  "+256": "UGX",   // Uganda
+  "+250": "RWF",   // Rwanda
+  "+251": "ETB",   // Ethiopia
+  "+243": "CDF",   // DR Congo
+  "+244": "AOA",   // Angola
+  "+258": "MZN",   // Mozambique
+  "+267": "BWP",   // Botswana
+  "+27": "ZAR",    // South Africa
+  "+212": "MAD",   // Morocco
+  "+216": "TND",   // Tunisia
+  "+20": "EGP",    // Egypt
+  "+1": "USD",     // USA/Canada
+  "+44": "GBP",    // UK
+  "+33": "EUR",    // France
+  "+49": "EUR",    // Germany
+  "+39": "EUR",    // Italy
+  "+34": "EUR",    // Spain
+  "+86": "CNY",    // China
+  "+81": "JPY",    // Japan
+  "+91": "INR",    // India
+  "+55": "BRL",    // Brazil
+  "+61": "AUD",    // Australia
+  "+41": "CHF",    // Switzerland
+};
+
+/**
+ * Detect currency from a phone number by matching the longest prefix.
+ */
+export function detectCurrencyFromPhone(phone: string): string {
+  const cleaned = phone.startsWith("+") ? phone : "+" + phone;
+  // Try longest prefix first (4 chars like +242) then shorter (3, 2)
+  for (let len = 4; len >= 2; len--) {
+    const prefix = cleaned.substring(0, len + 1); // +1 for the '+' sign
+    if (PHONE_PREFIX_TO_CURRENCY[prefix]) {
+      return PHONE_PREFIX_TO_CURRENCY[prefix];
+    }
+  }
+  return "XAF"; // Default to XAF for Central Africa
+}
+
+/**
+ * Map phone country codes to default language.
+ */
+export function detectLanguageFromPhone(phone: string): "en" | "fr" {
+  const cleaned = phone.startsWith("+") ? phone : "+" + phone;
+  const frenchPrefixes = ["+242", "+237", "+241", "+235", "+236", "+240", "+225", "+221", "+223", "+226", "+227", "+228", "+229", "+245", "+243", "+33", "+212", "+216"];
+  for (const prefix of frenchPrefixes) {
+    if (cleaned.startsWith(prefix)) return "fr";
+  }
+  return "en";
+}

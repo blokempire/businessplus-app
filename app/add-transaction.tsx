@@ -14,12 +14,12 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { TransactionType, Transaction } from "@/lib/store";
+import { TransactionType, Transaction, generateId } from "@/lib/store";
 
 export default function AddTransactionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ type?: string; editId?: string }>();
-  const { state, addTransaction, updateTransaction, translate } = useApp();
+  const { state, addTransaction, updateTransaction, addCategory, translate } = useApp();
   const colors = useColors();
 
   // Find existing transaction if editing
@@ -36,6 +36,8 @@ export default function AddTransactionScreen() {
   const [date, setDate] = useState(
     existingTx ? existingTx.date.split("T")[0] : new Date().toISOString().split("T")[0]
   );
+  const [showCustomCategory, setShowCustomCategory] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState("");
 
   const filteredCategories = useMemo(
     () => state.categories.filter((c) => c.type === txType),
@@ -152,7 +154,7 @@ export default function AddTransactionScreen() {
               {filteredCategories.map((cat) => (
                 <Pressable
                   key={cat.id}
-                  onPress={() => setSelectedCategory(cat.id)}
+                  onPress={() => { setSelectedCategory(cat.id); setShowCustomCategory(false); }}
                   style={({ pressed }) => [
                     styles.categoryItem,
                     {
@@ -182,7 +184,86 @@ export default function AddTransactionScreen() {
                   </Text>
                 </Pressable>
               ))}
+              {/* Add Custom Category Button */}
+              <Pressable
+                onPress={() => setShowCustomCategory(!showCustomCategory)}
+                style={({ pressed }) => [
+                  styles.categoryItem,
+                  {
+                    backgroundColor: showCustomCategory ? colors.primary + "20" : colors.surface,
+                    borderColor: showCustomCategory ? colors.primary : colors.border,
+                    borderStyle: "dashed" as any,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol
+                  name={"plus.circle.fill" as any}
+                  size={22}
+                  color={showCustomCategory ? colors.primary : colors.muted}
+                />
+                <Text
+                  style={[
+                    styles.categoryText,
+                    { color: showCustomCategory ? colors.primary : colors.muted },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {translate("addCategory")}
+                </Text>
+              </Pressable>
             </View>
+            {/* Custom Category Input */}
+            {showCustomCategory && (
+              <View style={{ marginTop: 12, flexDirection: "row", gap: 10 }}>
+                <TextInput
+                  style={[
+                    styles.descInput,
+                    { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface },
+                  ]}
+                  placeholder={translate("categoryName")}
+                  placeholderTextColor={colors.muted}
+                  value={customCategoryName}
+                  onChangeText={setCustomCategoryName}
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (customCategoryName.trim()) {
+                      const newId = generateId();
+                      addCategory(customCategoryName.trim(), "ellipsis", txType);
+                      // Find the newly added category and select it
+                      setTimeout(() => {
+                        const newCat = state.categories.find((c) => c.nameKey === customCategoryName.trim() && c.isCustom);
+                        if (newCat) setSelectedCategory(newCat.id);
+                      }, 100);
+                      setCustomCategoryName("");
+                      setShowCustomCategory(false);
+                    }
+                  }}
+                />
+                <Pressable
+                  onPress={() => {
+                    if (customCategoryName.trim()) {
+                      addCategory(customCategoryName.trim(), "ellipsis", txType);
+                      setTimeout(() => {
+                        const newCat = state.categories.find((c) => c.nameKey === customCategoryName.trim() && c.isCustom);
+                        if (newCat) setSelectedCategory(newCat.id);
+                      }, 100);
+                      setCustomCategoryName("");
+                      setShowCustomCategory(false);
+                    }
+                  }}
+                  style={({ pressed }) => [{
+                    backgroundColor: customCategoryName.trim() ? colors.primary : colors.muted,
+                    borderRadius: 14,
+                    paddingHorizontal: 20,
+                    justifyContent: "center",
+                    opacity: pressed ? 0.8 : 1,
+                  }]}
+                >
+                  <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 14 }}>{translate("save")}</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
 
           {/* Description */}

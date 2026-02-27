@@ -134,6 +134,8 @@ export default function InvoiceDetailScreen() {
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .company-logo { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; }
     .invoice-title { font-size: 32px; font-weight: 700; color: #0D9488; }
     .invoice-number { font-size: 14px; color: #666; margin-top: 4px; }
     .info-section { display: flex; justify-content: space-between; margin-bottom: 30px; }
@@ -157,9 +159,12 @@ export default function InvoiceDetailScreen() {
 </head>
 <body>
   <div class="header">
-    <div>
-      <div class="invoice-title">${translate("invoiceDetail")}</div>
-      <div class="invoice-number">${invoice.invoiceNumber}</div>
+    <div class="header-left">
+      ${state.profile.logoUri ? `<img src="${state.profile.logoUri}" class="company-logo" />` : ""}
+      <div>
+        <div class="invoice-title">${translate("invoiceDetail")}</div>
+        <div class="invoice-number">${invoice.invoiceNumber}</div>
+      </div>
     </div>
     <span class="status status-${invoice.status}">${invoice.status.toUpperCase()}</span>
   </div>
@@ -167,7 +172,7 @@ export default function InvoiceDetailScreen() {
   <div class="info-section">
     <div class="info-block">
       <h3>${translate("invoiceFrom")}</h3>
-      <p><strong>${state.profile.businessName || state.profile.name || "Mon Business"}</strong></p>
+      <p><strong>${state.profile.businessName || state.profile.name || "Business+"}</strong></p>
     </div>
     <div class="info-block">
       <h3>${translate("invoiceTo")}</h3>
@@ -216,7 +221,7 @@ export default function InvoiceDetailScreen() {
   ${invoice.note ? `<div class="note"><h4>${translate("invoiceNote")}</h4><p>${invoice.note}</p></div>` : ""}
 
   <div class="footer">
-    <p>${state.profile.businessName || "Mon Business"} &mdash; ${translate("appDescription")}</p>
+    <p>${state.profile.businessName || "Business+"} &mdash; ${translate("appDescription")}</p>
   </div>
 </body>
 </html>`;

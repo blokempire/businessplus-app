@@ -70,7 +70,7 @@ export default function TransactionDetailScreen() {
     </div>
   </div>
   <div class="footer">
-    <p>${state.profile.businessName || "Mon Business"}</p>
+    <p>${state.profile.businessName || "Business+"}</p>
   </div>
 </body>
 </html>`;

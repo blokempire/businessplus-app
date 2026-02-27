@@ -103,3 +103,11 @@
 - [x] Add subscription expiry check on app launch
 - [x] Update database schema for phone auth, subscriptions, and company groups
 - [x] Add i18n translations for all new auth/subscription/team features
+- [x] Fix: Auth page not showing — login screen should appear for unauthenticated users
+- [x] Show company logo on invoice PDF/preview
+- [x] Allow custom/personalized categories for income and expense transactions
+- [x] Fix: Auth gating — redirect unauthenticated users to login screen
+- [x] Keep MySQL database (suitable for public use, already production-ready)
+- [x] Add more currencies (XOF/FCFA, etc.) and auto-detect user locale for default currency and language
+- [x] Rename app from "Mon Business" to "Business+"
+- [x] Update branding (login screen, footer, etc.) to reflect Business+ name
