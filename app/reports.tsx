@@ -51,13 +51,15 @@ export default function ReportsScreen() {
   }, [periodTxs]);
 
   const getCategoryName = (categoryId: string) => {
+    if (categoryId.startsWith("custom_")) return categoryId.replace("custom_", "");
     const cat = state.categories.find((c) => c.id === categoryId);
-    if (!cat) return "";
+    if (!cat) return categoryId;
     if (cat.isCustom) return cat.nameKey;
     return translate(cat.nameKey as any);
   };
 
   const getCategoryIcon = (categoryId: string) => {
+    if (categoryId.startsWith("custom_")) return "ellipsis";
     const cat = state.categories.find((c) => c.id === categoryId);
     return cat?.icon || "ellipsis";
   };

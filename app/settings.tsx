@@ -229,25 +229,31 @@ export default function SettingsScreen() {
           onPress={() => router.push("/company" as any)}
         />
 
-        {isAuthenticated && (
+        {user?.role === "admin" && (
           <SettingRow
-            icon="rectangle.portrait.and.arrow.right"
-            label={translate("logout")}
-            onPress={() => {
-              Alert.alert(translate("confirm"), translate("logoutConfirm"), [
-                { text: translate("cancel"), style: "cancel" },
-                {
-                  text: translate("logout"),
-                  style: "destructive",
-                  onPress: async () => {
-                    await logout();
-                    router.replace("/login" as any);
-                  },
-                },
-              ]);
-            }}
+            icon="shield.fill"
+            label={translate("adminPanel")}
+            onPress={() => router.push("/admin" as any)}
           />
         )}
+
+        <SettingRow
+          icon="rectangle.portrait.and.arrow.right"
+          label={translate("logout")}
+          onPress={() => {
+            Alert.alert(translate("confirm"), translate("logoutConfirm"), [
+              { text: translate("cancel"), style: "cancel" },
+              {
+                text: translate("logout"),
+                style: "destructive",
+                onPress: async () => {
+                  await logout();
+                  router.replace("/login" as any);
+                },
+              },
+            ]);
+          }}
+        />
 
         {/* About */}
         <Text style={[styles.sectionTitle, { color: colors.muted }]}>{translate("about")}</Text>

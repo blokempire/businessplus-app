@@ -111,3 +111,20 @@
 - [x] Add more currencies (XOF/FCFA, etc.) and auto-detect user locale for default currency and language
 - [x] Rename app from "Mon Business" to "Business+"
 - [x] Update branding (login screen, footer, etc.) to reflect Business+ name
+- [x] Bug: Auth page → Dashboard transition broken (fixed authenticateRequest for phone users)
+- [x] Bug: No logout button visible in the app (added to tab settings screen)
+- [x] Bug: Company logo disappears on app update (fixed: copy to documentDirectory for persistence)
+- [x] Bug: Custom category incorrectly added to permanent list — fixed to one-time use only
+- [x] Bug: Export data destination unclear / not working (fixed: saves CSV and opens share sheet)
+- [x] Feature: Auto-detect country code on login phone input (timezone-based detection)
+- [x] Bug: Admin panel not visible (fixed: added to tab settings, fixed user.role type)
+- [x] Bug: Subscription plans screen not visible (fixed: added link to tab settings screen)
+- [x] Feature: Mobile money payment integration for subscriptions (MTN MoMo, Airtel Money, cash, WhatsApp contact)
+- [x] Feature: Payment request tracking with database (payment_requests table)
+- [x] Feature: User payment submission flow with transaction reference input
+- [x] Feature: Admin payment verification panel (approve/reject with auto-subscription activation)
+- [x] Feature: Payment history view for users (pending, approved, rejected status)
+- [x] Feature: Payment stats dashboard for admin (pending/approved/rejected counts, total revenue)
+- [x] Feature: Duplicate payment prevention (block if pending request exists for same plan)
+- [x] Feature: i18n translations for all payment features (EN + FR)
+- [x] Feature: Sync all business data to server database (transactions, contacts, stock, invoices) — server sync with local fallback

@@ -251,8 +251,17 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
+    // If user not in DB:
+    // - Phone-based users (openId starts with "phone_") should already exist; if not, session is invalid
+    // - OAuth users: try syncing from OAuth server
     if (!user) {
+      if (sessionUserId.startsWith("phone_")) {
+        // Phone-based user not found in DB — their session is stale or account was deleted
+        console.error("[Auth] Phone user not found in DB:", sessionUserId);
+        throw ForbiddenError("User not found. Please register again.");
+      }
+
+      // OAuth user — try syncing from OAuth server
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({

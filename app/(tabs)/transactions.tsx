@@ -58,8 +58,9 @@ export default function TransactionsScreen() {
 
   const getCategoryName = useCallback(
     (categoryId: string) => {
+      if (categoryId.startsWith("custom_")) return categoryId.replace("custom_", "");
       const cat = state.categories.find((c) => c.id === categoryId);
-      if (!cat) return "";
+      if (!cat) return categoryId;
       if (cat.isCustom) return cat.nameKey;
       return translate(cat.nameKey as any);
     },
@@ -68,6 +69,7 @@ export default function TransactionsScreen() {
 
   const getCategoryIcon = useCallback(
     (categoryId: string) => {
+      if (categoryId.startsWith("custom_")) return "ellipsis";
       const cat = state.categories.find((c) => c.id === categoryId);
       return cat?.icon || "ellipsis";
     },

@@ -44,23 +44,28 @@ export default function AddTransactionScreen() {
     [state.categories, txType]
   );
 
-  const isValid = amount && parseFloat(amount) > 0 && selectedCategory;
+  const [customCategoryDirect, setCustomCategoryDirect] = useState("");
+
+  const isValid = amount && parseFloat(amount) > 0 && (selectedCategory || customCategoryDirect);
 
   const handleSave = () => {
     if (!isValid) return;
     const parsedAmount = parseFloat(amount);
+
+    // Use custom category name directly if typed, otherwise use selected category ID
+    const finalCategoryId = customCategoryDirect ? `custom_${customCategoryDirect}` : selectedCategory;
 
     if (existingTx) {
       updateTransaction({
         ...existingTx,
         type: txType,
         amount: parsedAmount,
-        categoryId: selectedCategory,
+        categoryId: finalCategoryId,
         description,
         date: new Date(date).toISOString(),
       });
     } else {
-      addTransaction(txType, parsedAmount, selectedCategory, description, new Date(date).toISOString());
+      addTransaction(txType, parsedAmount, finalCategoryId, description, new Date(date).toISOString());
     }
     router.back();
   };
@@ -215,53 +220,31 @@ export default function AddTransactionScreen() {
             </View>
             {/* Custom Category Input */}
             {showCustomCategory && (
-              <View style={{ marginTop: 12, flexDirection: "row", gap: 10 }}>
+              <View style={{ marginTop: 12, gap: 8 }}>
                 <TextInput
                   style={[
                     styles.descInput,
-                    { flex: 1, color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface },
+                    { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface },
                   ]}
                   placeholder={translate("categoryName")}
                   placeholderTextColor={colors.muted}
                   value={customCategoryName}
-                  onChangeText={setCustomCategoryName}
+                  onChangeText={(text) => {
+                    setCustomCategoryName(text);
+                    if (text.trim()) {
+                      setCustomCategoryDirect(text.trim());
+                      setSelectedCategory("");
+                    } else {
+                      setCustomCategoryDirect("");
+                    }
+                  }}
                   returnKeyType="done"
-                  onSubmitEditing={() => {
-                    if (customCategoryName.trim()) {
-                      const newId = generateId();
-                      addCategory(customCategoryName.trim(), "ellipsis", txType);
-                      // Find the newly added category and select it
-                      setTimeout(() => {
-                        const newCat = state.categories.find((c) => c.nameKey === customCategoryName.trim() && c.isCustom);
-                        if (newCat) setSelectedCategory(newCat.id);
-                      }, 100);
-                      setCustomCategoryName("");
-                      setShowCustomCategory(false);
-                    }
-                  }}
                 />
-                <Pressable
-                  onPress={() => {
-                    if (customCategoryName.trim()) {
-                      addCategory(customCategoryName.trim(), "ellipsis", txType);
-                      setTimeout(() => {
-                        const newCat = state.categories.find((c) => c.nameKey === customCategoryName.trim() && c.isCustom);
-                        if (newCat) setSelectedCategory(newCat.id);
-                      }, 100);
-                      setCustomCategoryName("");
-                      setShowCustomCategory(false);
-                    }
-                  }}
-                  style={({ pressed }) => [{
-                    backgroundColor: customCategoryName.trim() ? colors.primary : colors.muted,
-                    borderRadius: 14,
-                    paddingHorizontal: 20,
-                    justifyContent: "center",
-                    opacity: pressed ? 0.8 : 1,
-                  }]}
-                >
-                  <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 14 }}>{translate("save")}</Text>
-                </Pressable>
+                {customCategoryName.trim() ? (
+                  <Text style={{ color: colors.success, fontSize: 12 }}>
+                    ✓ "{customCategoryName.trim()}"
+                  </Text>
+                ) : null}
               </View>
             )}
           </View>

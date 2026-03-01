@@ -1,6 +1,6 @@
 import { eq, desc, sql, and, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, companies, companyInvitations, InsertCompany, InsertCompanyInvitation } from "../drizzle/schema";
+import { InsertUser, users, companies, companyInvitations, InsertCompany, InsertCompanyInvitation, paymentRequests, InsertPaymentRequest } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -365,4 +365,364 @@ export async function removeCompanyMember(userId: number) {
     companyId: null,
     companyRole: "viewer",
   }).where(eq(users.id, userId));
+}
+
+// ─── Business Data CRUD ────────────────────────────────────────────
+
+import { categories, transactions, contacts, debtEntries, products, invoices, userProfiles } from "../drizzle/schema";
+
+// ─── User Profile ──────────────────────────────────────────────────
+
+export async function getUserProfile(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function upsertUserProfile(userId: number, data: {
+  name?: string;
+  businessName?: string;
+  currency?: string;
+  language?: string;
+  logoUri?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await getUserProfile(userId);
+  if (existing) {
+    const updateSet: Record<string, unknown> = {};
+    if (data.name !== undefined) updateSet.name = data.name;
+    if (data.businessName !== undefined) updateSet.businessName = data.businessName;
+    if (data.currency !== undefined) updateSet.currency = data.currency;
+    if (data.language !== undefined) updateSet.language = data.language;
+    if (data.logoUri !== undefined) updateSet.logoUri = data.logoUri;
+    if (Object.keys(updateSet).length > 0) {
+      await db.update(userProfiles).set(updateSet).where(eq(userProfiles.userId, userId));
+    }
+  } else {
+    await db.insert(userProfiles).values({
+      userId,
+      name: data.name || "",
+      businessName: data.businessName || "",
+      currency: data.currency || "XAF",
+      language: data.language || "fr",
+      logoUri: data.logoUri || "",
+    });
+  }
+  return getUserProfile(userId);
+}
+
+// ─── Categories ────────────────────────────────────────────────────
+
+export async function getUserCategories(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(categories).where(eq(categories.userId, userId));
+}
+
+export async function syncCategories(userId: number, cats: Array<{
+  clientId: string;
+  nameKey: string;
+  icon: string;
+  type: "income" | "expense";
+  isCustom: boolean;
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Delete existing and re-insert (simple sync)
+  await db.delete(categories).where(eq(categories.userId, userId));
+  if (cats.length > 0) {
+    await db.insert(categories).values(cats.map(c => ({
+      userId,
+      clientId: c.clientId,
+      nameKey: c.nameKey,
+      icon: c.icon,
+      type: c.type,
+      isCustom: c.isCustom,
+    })));
+  }
+}
+
+// ─── Transactions ──────────────────────────────────────────────────
+
+export async function getUserTransactions(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(transactions).where(eq(transactions.userId, userId)).orderBy(desc(transactions.createdAt));
+}
+
+export async function syncTransactions(userId: number, txns: Array<{
+  clientId: string;
+  type: "income" | "expense";
+  amount: number;
+  categoryId: string;
+  description: string;
+  date: string;
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(transactions).where(eq(transactions.userId, userId));
+  if (txns.length > 0) {
+    await db.insert(transactions).values(txns.map(t => ({
+      userId,
+      clientId: t.clientId,
+      type: t.type,
+      amount: t.amount,
+      categoryId: t.categoryId,
+      description: t.description || "",
+      date: t.date,
+    })));
+  }
+}
+
+// ─── Contacts ──────────────────────────────────────────────────────
+
+export async function getUserContacts(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(contacts).where(eq(contacts.userId, userId));
+}
+
+export async function syncContacts(userId: number, contactList: Array<{
+  clientId: string;
+  name: string;
+  phone: string;
+  note: string;
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(contacts).where(eq(contacts.userId, userId));
+  if (contactList.length > 0) {
+    await db.insert(contacts).values(contactList.map(c => ({
+      userId,
+      clientId: c.clientId,
+      name: c.name,
+      phone: c.phone || "",
+      note: c.note || "",
+    })));
+  }
+}
+
+// ─── Debt Entries ──────────────────────────────────────────────────
+
+export async function getUserDebtEntries(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(debtEntries).where(eq(debtEntries.userId, userId));
+}
+
+export async function syncDebtEntries(userId: number, entries: Array<{
+  clientId: string;
+  contactId: string;
+  type: "theyOweMe" | "iOweThem";
+  amount: number;
+  description: string;
+  date: string;
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(debtEntries).where(eq(debtEntries.userId, userId));
+  if (entries.length > 0) {
+    await db.insert(debtEntries).values(entries.map(e => ({
+      userId,
+      clientId: e.clientId,
+      contactId: e.contactId,
+      type: e.type,
+      amount: e.amount,
+      description: e.description || "",
+      date: e.date,
+    })));
+  }
+}
+
+// ─── Products ──────────────────────────────────────────────────────
+
+export async function getUserProducts(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(products).where(eq(products.userId, userId));
+}
+
+export async function syncProducts(userId: number, productList: Array<{
+  clientId: string;
+  name: string;
+  description: string;
+  price: number;
+  quantity: number;
+  unit: string;
+  photoUri: string;
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(products).where(eq(products.userId, userId));
+  if (productList.length > 0) {
+    await db.insert(products).values(productList.map(p => ({
+      userId,
+      clientId: p.clientId,
+      name: p.name,
+      description: p.description || "",
+      price: p.price,
+      quantity: p.quantity,
+      unit: p.unit || "pcs",
+      photoUri: p.photoUri || "",
+    })));
+  }
+}
+
+// ─── Invoices ──────────────────────────────────────────────────────
+
+export async function getUserInvoices(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(invoices).where(eq(invoices.userId, userId)).orderBy(desc(invoices.createdAt));
+}
+
+export async function syncInvoices(userId: number, invoiceList: Array<{
+  clientId: string;
+  invoiceNumber: string;
+  contactId: string;
+  contactName: string;
+  items: any;
+  subtotal: number;
+  discountType: "value" | "percentage";
+  discountValue: number;
+  discountAmount: number;
+  tax: number;
+  total: number;
+  status: "pending" | "paid" | "partial" | "cancelled";
+  paidAmount: number;
+  date: string;
+  dueDate: string;
+  note: string;
+  photoUris: string[];
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(invoices).where(eq(invoices.userId, userId));
+  if (invoiceList.length > 0) {
+    await db.insert(invoices).values(invoiceList.map(inv => ({
+      userId,
+      clientId: inv.clientId,
+      invoiceNumber: inv.invoiceNumber,
+      contactId: inv.contactId,
+      contactName: inv.contactName,
+      items: inv.items,
+      subtotal: inv.subtotal,
+      discountType: inv.discountType,
+      discountValue: inv.discountValue,
+      discountAmount: inv.discountAmount,
+      tax: inv.tax,
+      total: inv.total,
+      status: inv.status,
+      paidAmount: inv.paidAmount,
+      date: inv.date,
+      dueDate: inv.dueDate || "",
+      note: inv.note || "",
+      photoUris: inv.photoUris || [],
+    })));
+  }
+}
+
+// ─── Payment Request Functions ────────────────────────────────────────
+
+export async function createPaymentRequest(data: {
+  userId: number;
+  userPhone: string;
+  userName: string | null;
+  plan: "solo" | "team";
+  amount: number;
+  paymentMethod: "mtn_momo" | "airtel_money" | "cash" | "whatsapp" | "other";
+  transactionRef?: string;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(paymentRequests).values({
+    userId: data.userId,
+    userPhone: data.userPhone,
+    userName: data.userName,
+    plan: data.plan,
+    amount: data.amount,
+    paymentMethod: data.paymentMethod,
+    transactionRef: data.transactionRef || null,
+  });
+  return (result as any)[0].insertId;
+}
+
+export async function getPaymentRequests(status?: "pending" | "approved" | "rejected") {
+  const db = await getDb();
+  if (!db) return [];
+
+  if (status) {
+    return db.select().from(paymentRequests).where(eq(paymentRequests.status, status)).orderBy(desc(paymentRequests.createdAt));
+  }
+  return db.select().from(paymentRequests).orderBy(desc(paymentRequests.createdAt));
+}
+
+export async function getUserPaymentRequests(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(paymentRequests).where(eq(paymentRequests.userId, userId)).orderBy(desc(paymentRequests.createdAt));
+}
+
+export async function approvePaymentRequest(requestId: number, adminId: number, adminNote?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Get the payment request
+  const [request] = await db.select().from(paymentRequests).where(eq(paymentRequests.id, requestId));
+  if (!request) throw new Error("Payment request not found");
+  if (request.status !== "pending") throw new Error("Payment request already processed");
+
+  // Approve the request
+  await db.update(paymentRequests).set({
+    status: "approved",
+    processedBy: adminId,
+    adminNote: adminNote || null,
+    processedAt: new Date(),
+  }).where(eq(paymentRequests.id, requestId));
+
+  // Grant subscription to the user
+  await grantSubscription(request.userId, request.plan);
+
+  return { success: true };
+}
+
+export async function rejectPaymentRequest(requestId: number, adminId: number, adminNote?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(paymentRequests).set({
+    status: "rejected",
+    processedBy: adminId,
+    adminNote: adminNote || "Payment not verified",
+    processedAt: new Date(),
+  }).where(eq(paymentRequests.id, requestId));
+
+  return { success: true };
+}
+
+export async function getPaymentRequestStats() {
+  const db = await getDb();
+  if (!db) return { pending: 0, approved: 0, rejected: 0, totalRevenue: 0 };
+
+  const [pending] = await db.select({ count: sql<number>`count(*)` }).from(paymentRequests).where(eq(paymentRequests.status, "pending"));
+  const [approved] = await db.select({ count: sql<number>`count(*)`, total: sql<number>`COALESCE(SUM(amount), 0)` }).from(paymentRequests).where(eq(paymentRequests.status, "approved"));
+  const [rejected] = await db.select({ count: sql<number>`count(*)` }).from(paymentRequests).where(eq(paymentRequests.status, "rejected"));
+
+  return {
+    pending: pending?.count || 0,
+    approved: approved?.count || 0,
+    rejected: rejected?.count || 0,
+    totalRevenue: approved?.total || 0,
+  };
 }

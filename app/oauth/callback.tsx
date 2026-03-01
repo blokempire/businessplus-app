@@ -47,9 +47,17 @@ export default function OAuthCallback() {
               const userInfo: Auth.User = {
                 id: userData.id,
                 openId: userData.openId,
-                name: userData.name,
-                email: userData.email,
-                loginMethod: userData.loginMethod,
+                name: userData.name ?? null,
+                email: userData.email ?? null,
+                phone: userData.phone ?? null,
+                loginMethod: userData.loginMethod ?? null,
+                role: userData.role ?? "user",
+                status: userData.status ?? "active",
+                subscriptionPlan: userData.subscriptionPlan ?? "free",
+                subscriptionActive: userData.subscriptionActive ?? false,
+                subscriptionEndDate: userData.subscriptionEndDate ?? null,
+                companyId: userData.companyId ?? null,
+                companyRole: userData.companyRole ?? null,
                 lastSignedIn: new Date(userData.lastSignedIn || Date.now()),
               };
               await Auth.setUserInfo(userInfo);
@@ -198,9 +206,17 @@ export default function OAuthCallback() {
             const userInfo: Auth.User = {
               id: result.user.id,
               openId: result.user.openId,
-              name: result.user.name,
-              email: result.user.email,
-              loginMethod: result.user.loginMethod,
+              name: result.user.name ?? null,
+              email: result.user.email ?? null,
+              phone: result.user.phone ?? null,
+              loginMethod: result.user.loginMethod ?? null,
+              role: result.user.role ?? "user",
+              status: result.user.status ?? "active",
+              subscriptionPlan: result.user.subscriptionPlan ?? "free",
+              subscriptionActive: result.user.subscriptionActive ?? false,
+              subscriptionEndDate: result.user.subscriptionEndDate ?? null,
+              companyId: result.user.companyId ?? null,
+              companyRole: result.user.companyRole ?? null,
               lastSignedIn: new Date(result.user.lastSignedIn || Date.now()),
             };
             await Auth.setUserInfo(userInfo);

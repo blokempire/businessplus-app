@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from "react";
 import {
   Transaction,
   Category,
@@ -31,6 +31,9 @@ import {
   TransactionType,
 } from "./store";
 import { Language, getStoredLanguage, setStoredLanguage, t, TranslationKey } from "./i18n";
+import { getApiBaseUrl } from "@/constants/oauth";
+import * as Auth from "@/lib/_core/auth";
+import { Platform } from "react-native";
 
 // ─── State ───────────────────────────────────────────────────────────
 
@@ -137,6 +140,113 @@ const initialState: AppState = {
   isLoading: true,
 };
 
+// ─── Server Sync Helpers ────────────────────────────────────────────
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (Platform.OS !== "web") {
+    const token = await Auth.getSessionToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function pullFromServer(): Promise<{
+  profile: UserProfile | null;
+  categories: Category[];
+  transactions: Transaction[];
+  contacts: Contact[];
+  debtEntries: DebtEntry[];
+  products: Product[];
+  invoices: Invoice[];
+} | null> {
+  try {
+    const baseUrl = getApiBaseUrl();
+    const headers = await getAuthHeaders();
+    const url = `${baseUrl}/api/trpc/data.pull`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+      credentials: "include",
+    });
+    if (!response.ok) return null;
+    const json = await response.json();
+    // tRPC wraps in { result: { data: ... } }
+    const data = json?.result?.data;
+    if (!data) return null;
+    return {
+      profile: data.profile ? {
+        name: data.profile.name || "",
+        businessName: data.profile.businessName || "",
+        currency: data.profile.currency || "XAF",
+        language: (data.profile.language || "en") as Language,
+        logoUri: data.profile.logoUri || "",
+      } : null,
+      categories: data.categories || [],
+      transactions: data.transactions || [],
+      contacts: data.contacts || [],
+      debtEntries: data.debtEntries || [],
+      products: data.products || [],
+      invoices: data.invoices || [],
+    };
+  } catch (err) {
+    console.log("[Sync] Pull from server failed, using local data:", err);
+    return null;
+  }
+}
+
+async function pushToServer(state: AppState): Promise<void> {
+  try {
+    const baseUrl = getApiBaseUrl();
+    const headers = await getAuthHeaders();
+    const url = `${baseUrl}/api/trpc/data.push`;
+    const body = JSON.stringify({
+      profile: {
+        name: state.profile.name,
+        businessName: state.profile.businessName,
+        currency: state.profile.currency,
+        language: state.profile.language,
+        logoUri: state.profile.logoUri,
+      },
+      categories: state.categories.filter(c => c.isCustom).map(c => ({
+        id: c.id, nameKey: c.nameKey, icon: c.icon, type: c.type, isCustom: c.isCustom,
+      })),
+      transactions: state.transactions.map(tx => ({
+        id: tx.id, type: tx.type, amount: tx.amount, categoryId: tx.categoryId,
+        description: tx.description, date: tx.date,
+      })),
+      contacts: state.contacts.map(c => ({
+        id: c.id, name: c.name, phone: c.phone, note: c.note,
+      })),
+      debtEntries: state.debtEntries.map(d => ({
+        id: d.id, contactId: d.contactId, type: d.type, amount: d.amount,
+        description: d.description, date: d.date,
+      })),
+      products: state.products.map(p => ({
+        id: p.id, name: p.name, description: p.description, price: p.price,
+        quantity: p.quantity, unit: p.unit, photoUri: p.photoUri,
+      })),
+      invoices: state.invoices.map(inv => ({
+        id: inv.id, invoiceNumber: inv.invoiceNumber, contactId: inv.contactId,
+        contactName: inv.contactName, items: inv.items, subtotal: inv.subtotal,
+        discountType: inv.discountType, discountValue: inv.discountValue,
+        discountAmount: inv.discountAmount, tax: inv.tax, total: inv.total,
+        status: inv.status, paidAmount: inv.paidAmount, date: inv.date,
+        dueDate: inv.dueDate, note: inv.note, photoUris: inv.photoUris,
+      })),
+    });
+
+    await fetch(url, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body,
+    });
+  } catch (err) {
+    console.log("[Sync] Push to server failed (will retry):", err);
+  }
+}
+
 // ─── Context ─────────────────────────────────────────────────────────
 
 interface AppContextType {
@@ -154,7 +264,7 @@ interface AppContextType {
   deleteContact: (id: string) => void;
   addDebtEntry: (contactId: string, type: DebtType, amount: number, description: string, date: string) => void;
   deleteDebtEntry: (id: string) => void;
-  settleContact: (contactId: string) => void; // Clears all debts for this contact
+  settleContact: (contactId: string) => void;
   addProduct: (name: string, description: string, price: number, quantity: number, unit: string, photoUri: string) => Product;
   updateProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
@@ -169,10 +279,14 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialLoadRef = useRef(true);
 
+  // ─── Load data on mount ──────────────────────────────────────────
   useEffect(() => {
     (async () => {
-      const [transactions, categories, profile, language, contacts, debtEntries, products, invoices] = await Promise.all([
+      // First, load from local storage (fast, always available)
+      const [localTxns, localCats, localProfile, language, localContacts, localDebts, localProducts, localInvoices] = await Promise.all([
         loadTransactions(),
         loadCategories(),
         loadProfile(),
@@ -182,21 +296,88 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         loadProducts(),
         loadInvoices(),
       ]);
-      dispatch({
-        type: "LOAD_DATA",
-        payload: { transactions, categories, profile: { ...profile, language }, language, contacts, debtEntries, products, invoices },
-      });
+
+      let finalData = {
+        transactions: localTxns,
+        categories: localCats,
+        profile: { ...localProfile, language },
+        language,
+        contacts: localContacts,
+        debtEntries: localDebts,
+        products: localProducts,
+        invoices: localInvoices,
+      };
+
+      // Then, try to pull from server (if user is authenticated)
+      const serverData = await pullFromServer();
+      if (serverData) {
+        // Merge server data with local — server takes priority if it has data
+        const hasServerData = serverData.transactions.length > 0 || serverData.contacts.length > 0 ||
+          serverData.products.length > 0 || serverData.invoices.length > 0;
+
+        if (hasServerData) {
+          // Server has data — use server data
+          const serverProfile = serverData.profile || localProfile;
+          const serverLang = (serverProfile.language || language) as Language;
+          const mergedCats = [...DEFAULT_CATEGORIES];
+          const defaultIds = new Set(DEFAULT_CATEGORIES.map(c => c.id));
+          for (const cat of serverData.categories) {
+            if (!defaultIds.has(cat.id)) mergedCats.push(cat);
+          }
+
+          finalData = {
+            transactions: serverData.transactions,
+            categories: mergedCats,
+            profile: { ...serverProfile, language: serverLang },
+            language: serverLang,
+            contacts: serverData.contacts,
+            debtEntries: serverData.debtEntries,
+            products: serverData.products,
+            invoices: serverData.invoices,
+          };
+        } else if (localTxns.length > 0 || localContacts.length > 0 || localProducts.length > 0 || localInvoices.length > 0) {
+          // Server is empty but local has data — push local data to server (first-time sync)
+          const stateToSync: AppState = {
+            ...finalData,
+            isLoading: false,
+          };
+          pushToServer(stateToSync).catch(() => {});
+        }
+      }
+
+      dispatch({ type: "LOAD_DATA", payload: finalData });
+      isInitialLoadRef.current = false;
     })();
   }, []);
 
-  // Persist effects
-  useEffect(() => { if (!state.isLoading) saveTransactions(state.transactions); }, [state.transactions, state.isLoading]);
-  useEffect(() => { if (!state.isLoading) saveCategories(state.categories); }, [state.categories, state.isLoading]);
-  useEffect(() => { if (!state.isLoading) saveProfile(state.profile); }, [state.profile, state.isLoading]);
-  useEffect(() => { if (!state.isLoading) saveContacts(state.contacts); }, [state.contacts, state.isLoading]);
-  useEffect(() => { if (!state.isLoading) saveDebtEntries(state.debtEntries); }, [state.debtEntries, state.isLoading]);
-  useEffect(() => { if (!state.isLoading) saveProducts(state.products); }, [state.products, state.isLoading]);
-  useEffect(() => { if (!state.isLoading) saveInvoices(state.invoices); }, [state.invoices, state.isLoading]);
+  // ─── Persist to local storage + debounced server sync ─────────────
+  useEffect(() => {
+    if (state.isLoading) return;
+    saveTransactions(state.transactions);
+    saveCategories(state.categories);
+    saveProfile(state.profile);
+    saveContacts(state.contacts);
+    saveDebtEntries(state.debtEntries);
+    saveProducts(state.products);
+    saveInvoices(state.invoices);
+
+    // Debounced server sync — push after 2 seconds of inactivity
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      if (!isInitialLoadRef.current) {
+        pushToServer(state).catch(() => {});
+      }
+    }, 2000);
+  }, [state.transactions, state.categories, state.profile, state.contacts, state.debtEntries, state.products, state.invoices, state.isLoading]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    };
+  }, []);
+
+  // ─── Transaction Actions ──────────────────────────────────────────
 
   const addTransaction = useCallback(
     (type: TransactionType, amount: number, categoryId: string, description: string, date: string) => {
@@ -222,6 +403,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const translate = useCallback((key: TranslationKey) => t(key, state.language), [state.language]);
 
+  // ─── Contact Actions ──────────────────────────────────────────────
+
   const addContact = useCallback((name: string, phone: string, note: string): Contact => {
     const contact: Contact = { id: generateId(), name, phone, note, createdAt: new Date().toISOString() };
     dispatch({ type: "ADD_CONTACT", payload: contact });
@@ -241,7 +424,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const settleContact = useCallback(
     (contactId: string) => {
-      // Calculate the net balance before settling
       let theyOweMe = 0;
       let iOweThem = 0;
       for (const entry of state.debtEntries) {
@@ -250,14 +432,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         else iOweThem += entry.amount;
       }
       const net = theyOweMe - iOweThem;
-
-      // Find the contact name for the description
       const contact = state.contacts.find((c) => c.id === contactId);
       const contactName = contact?.name || "";
 
-      // If there's a remaining balance, record it as a transaction AND as a settlement debt entry
       if (net !== 0) {
-        // Record as a regular transaction (income if they paid us, expense if we paid them)
         const tx: Transaction = {
           id: generateId(),
           type: net > 0 ? "income" : "expense",
@@ -269,8 +447,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
         dispatch({ type: "ADD_TRANSACTION", payload: tx });
 
-        // Add a settlement entry to the contact's debt history (opposite of the net to zero out)
-        // This keeps the history visible — old entries stay, plus a new "settlement" entry
         const settlementEntry: DebtEntry = {
           id: generateId(),
           contactId,
@@ -325,7 +501,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       dispatch({ type: "ADD_INVOICE", payload: invoice });
 
-      // Auto-add to debt zone: the contact owes this invoice total
       const debtEntry: DebtEntry = {
         id: generateId(),
         contactId,
@@ -337,7 +512,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       dispatch({ type: "ADD_DEBT_ENTRY", payload: debtEntry });
 
-      // Deduct stock for each item
       for (const item of items) {
         const product = state.products.find((p) => p.id === item.productId);
         if (product) {
@@ -352,24 +526,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateInvoice = useCallback((invoice: Invoice) => { dispatch({ type: "UPDATE_INVOICE", payload: invoice }); }, []);
   const deleteInvoice = useCallback((id: string) => { dispatch({ type: "DELETE_INVOICE", payload: id }); }, []);
 
-  // Change invoice status — when marked as paid, remove debt; when unpaid, add debt
   const changeInvoiceStatus = useCallback((invoiceId: string, newStatus: InvoiceStatus) => {
     const invoice = state.invoices.find((inv) => inv.id === invoiceId);
     if (!invoice) return;
     const updatedInvoice = { ...invoice, status: newStatus, paidAmount: newStatus === "paid" ? invoice.total : invoice.paidAmount };
     dispatch({ type: "UPDATE_INVOICE", payload: updatedInvoice });
 
-    if (newStatus === "paid") {
-      // Remove the auto-created debt entry for this invoice
-      const debtDesc = `Invoice ${invoice.invoiceNumber}`;
-      const matchingDebt = state.debtEntries.find(
-        (e) => e.contactId === invoice.contactId && e.description === debtDesc
-      );
-      if (matchingDebt) {
-        dispatch({ type: "DELETE_DEBT_ENTRY", payload: matchingDebt.id });
-      }
-    } else if (newStatus === "cancelled") {
-      // Remove the auto-created debt entry for this invoice
+    if (newStatus === "paid" || newStatus === "cancelled") {
       const debtDesc = `Invoice ${invoice.invoiceNumber}`;
       const matchingDebt = state.debtEntries.find(
         (e) => e.contactId === invoice.contactId && e.description === debtDesc
@@ -378,7 +541,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: "DELETE_DEBT_ENTRY", payload: matchingDebt.id });
       }
     } else if (newStatus === "pending" && invoice.status !== "pending") {
-      // Re-add debt if changing back to pending
       const debtEntry: DebtEntry = {
         id: generateId(),
         contactId: invoice.contactId,
@@ -392,7 +554,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.invoices, state.debtEntries]);
 
-  // Make partial payment on an invoice — reduces debt and updates paidAmount
   const makePartialPayment = useCallback((invoiceId: string, paymentAmount: number) => {
     const invoice = state.invoices.find((inv) => inv.id === invoiceId);
     if (!invoice) return;
@@ -404,24 +565,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const updatedInvoice = { ...invoice, paidAmount: newPaidAmount, status: newStatus };
     dispatch({ type: "UPDATE_INVOICE", payload: updatedInvoice });
 
-    // Update the debt entry for this invoice
     const debtDesc = `Invoice ${invoice.invoiceNumber}`;
     const matchingDebt = state.debtEntries.find(
       (e) => e.contactId === invoice.contactId && e.description === debtDesc
     );
 
     if (remaining <= 0) {
-      // Fully paid — remove debt
       if (matchingDebt) {
         dispatch({ type: "DELETE_DEBT_ENTRY", payload: matchingDebt.id });
       }
     } else if (matchingDebt) {
-      // Partially paid — reduce debt amount
       const updatedDebt = { ...matchingDebt, amount: remaining };
       dispatch({ type: "UPDATE_DEBT_ENTRY", payload: updatedDebt });
     }
 
-    // Record the payment as an income transaction
     const tx: Transaction = {
       id: generateId(),
       type: "income",

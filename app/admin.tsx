@@ -140,9 +140,55 @@ export default function AdminScreen() {
     setLoading(usersQuery.isLoading);
   }, [usersQuery.data, usersQuery.isLoading]);
 
+  // Payment request mutations
+  const approvePaymentMutation = trpc.admin.approvePayment.useMutation({
+    onSuccess: () => {
+      Alert.alert(translate("success"), translate("paymentApprovedSuccess"));
+      refetchAll();
+    },
+    onError: (err: any) => Alert.alert(translate("error"), err.message),
+  });
+
+  const rejectPaymentMutation = trpc.admin.rejectPayment.useMutation({
+    onSuccess: () => {
+      Alert.alert(translate("success"), translate("paymentRejectedSuccess"));
+      refetchAll();
+    },
+    onError: (err: any) => Alert.alert(translate("error"), err.message),
+  });
+
+  const paymentRequestsQuery = trpc.admin.paymentRequests.useQuery(undefined, { retry: false });
+  const paymentStatsQuery = trpc.admin.paymentStats.useQuery(undefined, { retry: false });
+
+  const [paymentListVisible, setPaymentListVisible] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+
+  const paymentRequests = paymentRequestsQuery.data || [];
+  const paymentStats = paymentStatsQuery.data || { pending: 0, approved: 0, rejected: 0, totalRevenue: 0 };
+
+  const filteredPayments = paymentFilter === "all"
+    ? paymentRequests
+    : paymentRequests.filter((p: any) => p.status === paymentFilter);
+
+  const handleApprovePayment = (requestId: number, userName: string) => {
+    Alert.alert(translate("approvePayment"), translate("approvePaymentConfirm"), [
+      { text: translate("cancel"), style: "cancel" },
+      { text: translate("confirm"), onPress: () => approvePaymentMutation.mutate({ requestId }) },
+    ]);
+  };
+
+  const handleRejectPayment = (requestId: number, userName: string) => {
+    Alert.alert(translate("rejectPayment"), translate("rejectPaymentConfirm"), [
+      { text: translate("cancel"), style: "cancel" },
+      { text: translate("confirm"), style: "destructive", onPress: () => rejectPaymentMutation.mutate({ requestId }) },
+    ]);
+  };
+
   const refetchAll = useCallback(() => {
     utils.admin.stats.invalidate();
     utils.admin.listUsers.invalidate();
+    utils.admin.paymentRequests.invalidate();
+    utils.admin.paymentStats.invalidate();
   }, [utils]);
 
   const onRefresh = useCallback(async () => {
@@ -317,6 +363,27 @@ export default function AdminScreen() {
                 {renderStatCard(translate("subscriberCount"), stats.subscribers || 0, colors.warning, "creditcard.fill")}
                 {renderStatCard(translate("expiredCount"), stats.expired || 0, colors.error, "xmark.circle.fill")}
               </View>
+
+              {/* Payment Requests Banner */}
+              <Pressable
+                onPress={() => setPaymentListVisible(true)}
+                style={({ pressed }) => [styles.paymentBanner, { backgroundColor: paymentStats.pending > 0 ? colors.warning + "15" : colors.surface, borderColor: paymentStats.pending > 0 ? colors.warning : colors.border, opacity: pressed ? 0.8 : 1 }]}
+              >
+                <View style={[styles.paymentBannerIcon, { backgroundColor: paymentStats.pending > 0 ? colors.warning + "25" : colors.primary + "20" }]}>
+                  <IconSymbol name="creditcard.fill" size={22} color={paymentStats.pending > 0 ? colors.warning : colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.paymentBannerTitle, { color: colors.foreground }]}>
+                    {translate("paymentRequests")}
+                  </Text>
+                  <Text style={[styles.paymentBannerSubtitle, { color: colors.muted }]}>
+                    {paymentStats.pending > 0 ? `${paymentStats.pending} ${translate("pendingPayments").toLowerCase()}` : translate("noPaymentRequests")}
+                    {paymentStats.totalRevenue > 0 ? ` • ${translate("totalRevenue")}: ${Number(paymentStats.totalRevenue).toLocaleString()} XAF` : ""}
+                  </Text>
+                </View>
+                <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+              </Pressable>
+
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{translate("userManagement")}</Text>
             </View>
           }
@@ -520,6 +587,118 @@ export default function AdminScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* Payment Requests Modal */}
+      <Modal visible={paymentListVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPaymentListVisible(false)}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          {/* Header */}
+          <View style={styles.paymentModalHeader}>
+            <Pressable onPress={() => setPaymentListVisible(false)} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
+              <Text style={[styles.paymentModalClose, { color: colors.primary }]}>{translate("cancel")}</Text>
+            </Pressable>
+            <Text style={[styles.paymentModalTitle, { color: colors.foreground }]}>{translate("paymentRequests")}</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <View style={styles.paymentModalContent}>
+            {/* Payment Stats */}
+            <View style={styles.paymentStatsRow}>
+              <View style={[styles.paymentStatItem, { backgroundColor: colors.warning + "15" }]}>
+                <Text style={[styles.paymentStatValue, { color: colors.warning }]}>{paymentStats.pending}</Text>
+                <Text style={[styles.paymentStatLabel, { color: colors.muted }]}>{translate("pendingPayments")}</Text>
+              </View>
+              <View style={[styles.paymentStatItem, { backgroundColor: colors.success + "15" }]}>
+                <Text style={[styles.paymentStatValue, { color: colors.success }]}>{paymentStats.approved}</Text>
+                <Text style={[styles.paymentStatLabel, { color: colors.muted }]}>{translate("approvedPayments")}</Text>
+              </View>
+              <View style={[styles.paymentStatItem, { backgroundColor: colors.error + "15" }]}>
+                <Text style={[styles.paymentStatValue, { color: colors.error }]}>{paymentStats.rejected}</Text>
+                <Text style={[styles.paymentStatLabel, { color: colors.muted }]}>{translate("rejectedPayments")}</Text>
+              </View>
+            </View>
+
+            {/* Filter Tabs */}
+            <View style={styles.paymentFilterRow}>
+              {(["pending", "approved", "rejected", "all"] as const).map((filter) => (
+                <Pressable
+                  key={filter}
+                  onPress={() => setPaymentFilter(filter)}
+                  style={[styles.paymentFilterBtn, {
+                    backgroundColor: paymentFilter === filter ? colors.primary : "transparent",
+                    borderColor: paymentFilter === filter ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[styles.paymentFilterBtnText, {
+                    color: paymentFilter === filter ? "#FFF" : colors.muted,
+                  }]}>
+                    {filter === "pending" ? translate("pendingPayments") :
+                     filter === "approved" ? translate("approvedPayments") :
+                     filter === "rejected" ? translate("rejectedPayments") : "All"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Payment List */}
+            <FlatList
+              data={filteredPayments}
+              keyExtractor={(item: any) => String(item.id)}
+              renderItem={({ item }: { item: any }) => (
+                <View style={[styles.paymentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={styles.paymentCardHeader}>
+                    <Text style={[styles.paymentCardUser, { color: colors.foreground }]} numberOfLines={1}>
+                      {item.userName || item.userPhone}
+                    </Text>
+                    <Text style={[styles.paymentCardStatus, {
+                      color: item.status === "pending" ? colors.warning : item.status === "approved" ? colors.success : colors.error,
+                      backgroundColor: (item.status === "pending" ? colors.warning : item.status === "approved" ? colors.success : colors.error) + "15",
+                    }]}>
+                      {item.status === "pending" ? translate("paymentPending") :
+                       item.status === "approved" ? translate("paymentApproved") :
+                       translate("paymentRejected")}
+                    </Text>
+                  </View>
+                  <View style={styles.paymentCardDetails}>
+                    <Text style={[styles.paymentCardDetail, { color: colors.foreground }]}>
+                      {item.plan === "solo" ? translate("soloPlan") : translate("teamPlan")} — {item.amount?.toLocaleString()} XAF
+                    </Text>
+                    <Text style={[styles.paymentCardDetail, { color: colors.muted }]}>
+                      {item.paymentMethod === "mtn_momo" ? "MTN MoMo" : item.paymentMethod === "airtel_money" ? "Airtel Money" : item.paymentMethod === "cash" ? translate("cashPayment") : "WhatsApp"}
+                      {item.transactionRef ? ` • Ref: ${item.transactionRef}` : ""}
+                    </Text>
+                    <Text style={[styles.paymentCardDetail, { color: colors.muted }]}>
+                      {translate("phone")}: {item.userPhone} • {new Date(item.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  {item.status === "pending" && (
+                    <View style={styles.paymentCardActions}>
+                      <Pressable
+                        onPress={() => handleApprovePayment(item.id, item.userName || item.userPhone)}
+                        style={({ pressed }) => [styles.paymentActionBtn, { backgroundColor: colors.success, opacity: pressed ? 0.8 : 1 }]}
+                      >
+                        <Text style={[styles.paymentActionBtnText, { color: "#FFF" }]}>{translate("approvePayment")}</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleRejectPayment(item.id, item.userName || item.userPhone)}
+                        style={({ pressed }) => [styles.paymentActionBtn, { backgroundColor: colors.error, opacity: pressed ? 0.8 : 1 }]}
+                      >
+                        <Text style={[styles.paymentActionBtnText, { color: "#FFF" }]}>{translate("rejectPayment")}</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              )}
+              contentContainerStyle={{ paddingBottom: 40 }}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <IconSymbol name="creditcard.fill" size={48} color={colors.muted} />
+                  <Text style={[styles.emptyText, { color: colors.muted }]}>{translate("noPaymentRequests")}</Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -582,4 +761,28 @@ const styles = StyleSheet.create({
   actionInfo: { flex: 1, marginLeft: 12 },
   actionTitle: { fontSize: 15, fontWeight: "600" },
   actionDesc: { fontSize: 12, marginTop: 2 },
+  paymentBanner: { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 20, gap: 12 },
+  paymentBannerIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  paymentBannerTitle: { fontSize: 15, fontWeight: "700" },
+  paymentBannerSubtitle: { fontSize: 12, marginTop: 2 },
+  paymentFilterRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  paymentFilterBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  paymentFilterBtnText: { fontSize: 13, fontWeight: "600" },
+  paymentCard: { padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 10 },
+  paymentCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  paymentCardUser: { fontSize: 15, fontWeight: "700", flex: 1 },
+  paymentCardStatus: { fontSize: 12, fontWeight: "600", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, overflow: "hidden" },
+  paymentCardDetails: { gap: 4, marginBottom: 10 },
+  paymentCardDetail: { fontSize: 13 },
+  paymentCardActions: { flexDirection: "row", gap: 10 },
+  paymentActionBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10 },
+  paymentActionBtnText: { fontSize: 14, fontWeight: "600" },
+  paymentModalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  paymentModalTitle: { fontSize: 18, fontWeight: "700" },
+  paymentModalClose: { fontSize: 16, fontWeight: "600" },
+  paymentModalContent: { paddingHorizontal: 20, flex: 1 },
+  paymentStatsRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  paymentStatItem: { flex: 1, alignItems: "center", padding: 10, borderRadius: 10 },
+  paymentStatValue: { fontSize: 20, fontWeight: "800" },
+  paymentStatLabel: { fontSize: 11, fontWeight: "500", marginTop: 2 },
 });

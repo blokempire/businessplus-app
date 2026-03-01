@@ -263,6 +263,153 @@ export const appRouter = router({
     }),
   }),
 
+  // ─── Data Sync Routes ────────────────────────────────────────────
+  data: router({
+    /** Get all user data from server */
+    pull: protectedProcedure.query(async ({ ctx }) => {
+      const userId = ctx.user.id;
+      const [profile, cats, txns, contactList, debts, productList, invoiceList] = await Promise.all([
+        db.getUserProfile(userId),
+        db.getUserCategories(userId),
+        db.getUserTransactions(userId),
+        db.getUserContacts(userId),
+        db.getUserDebtEntries(userId),
+        db.getUserProducts(userId),
+        db.getUserInvoices(userId),
+      ]);
+      return {
+        profile: profile || null,
+        categories: cats.map(c => ({ id: c.clientId, nameKey: c.nameKey, icon: c.icon, type: c.type, isCustom: c.isCustom })),
+        transactions: txns.map(t => ({ id: t.clientId, type: t.type, amount: t.amount, categoryId: t.categoryId, description: t.description || "", date: t.date, createdAt: t.createdAt.toISOString() })),
+        contacts: contactList.map(c => ({ id: c.clientId, name: c.name, phone: c.phone || "", note: c.note || "", createdAt: c.createdAt.toISOString() })),
+        debtEntries: debts.map(d => ({ id: d.clientId, contactId: d.contactId, type: d.type, amount: d.amount, description: d.description || "", date: d.date, createdAt: d.createdAt.toISOString() })),
+        products: productList.map(p => ({ id: p.clientId, name: p.name, description: p.description || "", price: p.price, quantity: p.quantity, unit: p.unit, photoUri: p.photoUri || "", createdAt: p.createdAt.toISOString() })),
+        invoices: invoiceList.map(inv => ({
+          id: inv.clientId, invoiceNumber: inv.invoiceNumber, contactId: inv.contactId, contactName: inv.contactName,
+          items: inv.items as any, subtotal: inv.subtotal, discountType: inv.discountType, discountValue: inv.discountValue,
+          discountAmount: inv.discountAmount, tax: inv.tax, total: inv.total, status: inv.status, paidAmount: inv.paidAmount,
+          date: inv.date, dueDate: inv.dueDate || "", note: inv.note || "", photoUris: (inv.photoUris as string[]) || [], createdAt: inv.createdAt.toISOString(),
+        })),
+      };
+    }),
+
+    /** Push all user data to server (full sync) */
+    push: protectedProcedure
+      .input(z.object({
+        profile: z.object({
+          name: z.string().optional(),
+          businessName: z.string().optional(),
+          currency: z.string().optional(),
+          language: z.string().optional(),
+          logoUri: z.string().optional(),
+        }).optional(),
+        categories: z.array(z.object({
+          id: z.string(),
+          nameKey: z.string(),
+          icon: z.string(),
+          type: z.enum(["income", "expense"]),
+          isCustom: z.boolean(),
+        })).optional(),
+        transactions: z.array(z.object({
+          id: z.string(),
+          type: z.enum(["income", "expense"]),
+          amount: z.number(),
+          categoryId: z.string(),
+          description: z.string(),
+          date: z.string(),
+        })).optional(),
+        contacts: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          phone: z.string(),
+          note: z.string(),
+        })).optional(),
+        debtEntries: z.array(z.object({
+          id: z.string(),
+          contactId: z.string(),
+          type: z.enum(["theyOweMe", "iOweThem"]),
+          amount: z.number(),
+          description: z.string(),
+          date: z.string(),
+        })).optional(),
+        products: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          description: z.string(),
+          price: z.number(),
+          quantity: z.number(),
+          unit: z.string(),
+          photoUri: z.string(),
+        })).optional(),
+        invoices: z.array(z.object({
+          id: z.string(),
+          invoiceNumber: z.string(),
+          contactId: z.string(),
+          contactName: z.string(),
+          items: z.any(),
+          subtotal: z.number(),
+          discountType: z.enum(["value", "percentage"]),
+          discountValue: z.number(),
+          discountAmount: z.number(),
+          tax: z.number(),
+          total: z.number(),
+          status: z.enum(["pending", "paid", "partial", "cancelled"]),
+          paidAmount: z.number(),
+          date: z.string(),
+          dueDate: z.string(),
+          note: z.string(),
+          photoUris: z.array(z.string()),
+        })).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const userId = ctx.user.id;
+        const promises: Promise<any>[] = [];
+
+        if (input.profile) {
+          promises.push(db.upsertUserProfile(userId, input.profile));
+        }
+        if (input.categories) {
+          promises.push(db.syncCategories(userId, input.categories.map(c => ({ clientId: c.id, nameKey: c.nameKey, icon: c.icon, type: c.type, isCustom: c.isCustom }))));
+        }
+        if (input.transactions) {
+          promises.push(db.syncTransactions(userId, input.transactions.map(t => ({ clientId: t.id, type: t.type, amount: t.amount, categoryId: t.categoryId, description: t.description, date: t.date }))));
+        }
+        if (input.contacts) {
+          promises.push(db.syncContacts(userId, input.contacts.map(c => ({ clientId: c.id, name: c.name, phone: c.phone, note: c.note }))));
+        }
+        if (input.debtEntries) {
+          promises.push(db.syncDebtEntries(userId, input.debtEntries.map(d => ({ clientId: d.id, contactId: d.contactId, type: d.type, amount: d.amount, description: d.description, date: d.date }))));
+        }
+        if (input.products) {
+          promises.push(db.syncProducts(userId, input.products.map(p => ({ clientId: p.id, name: p.name, description: p.description, price: p.price, quantity: p.quantity, unit: p.unit, photoUri: p.photoUri }))));
+        }
+        if (input.invoices) {
+          promises.push(db.syncInvoices(userId, input.invoices.map(inv => ({
+            clientId: inv.id, invoiceNumber: inv.invoiceNumber, contactId: inv.contactId, contactName: inv.contactName,
+            items: inv.items, subtotal: inv.subtotal, discountType: inv.discountType, discountValue: inv.discountValue,
+            discountAmount: inv.discountAmount, tax: inv.tax, total: inv.total, status: inv.status, paidAmount: inv.paidAmount,
+            date: inv.date, dueDate: inv.dueDate, note: inv.note, photoUris: inv.photoUris,
+          }))));
+        }
+
+        await Promise.all(promises);
+        return { success: true };
+      }),
+
+    /** Update just the user profile */
+    updateProfile: protectedProcedure
+      .input(z.object({
+        name: z.string().optional(),
+        businessName: z.string().optional(),
+        currency: z.string().optional(),
+        language: z.string().optional(),
+        logoUri: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        return db.upsertUserProfile(ctx.user.id, input);
+      }),
+  }),
+
   // ─── Admin Routes ────────────────────────────────────────────────
   admin: router({
     /** Get dashboard stats */
@@ -344,6 +491,67 @@ export const appRouter = router({
     expireSubscriptions: adminProcedure.mutation(async () => {
       await db.expireSubscriptions();
       return { success: true };
+    }),
+
+    /** Get all payment requests (optionally filtered by status) */
+    paymentRequests: adminProcedure
+      .input(z.object({ status: z.enum(["pending", "approved", "rejected"]).optional() }).optional())
+      .query(async ({ input }) => {
+        return db.getPaymentRequests(input?.status);
+      }),
+
+    /** Get payment request stats */
+    paymentStats: adminProcedure.query(async () => {
+      return db.getPaymentRequestStats();
+    }),
+
+    /** Approve a payment request (auto-activates subscription) */
+    approvePayment: adminProcedure
+      .input(z.object({
+        requestId: z.number(),
+        note: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        return db.approvePaymentRequest(input.requestId, ctx.user.id, input.note);
+      }),
+
+    /** Reject a payment request */
+    rejectPayment: adminProcedure
+      .input(z.object({
+        requestId: z.number(),
+        note: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        return db.rejectPaymentRequest(input.requestId, ctx.user.id, input.note);
+      }),
+  }),
+
+  // ─── Payment Routes (user-facing) ────────────────────────────────
+  payment: router({
+    /** Submit a payment request after mobile money transfer */
+    submit: protectedProcedure
+      .input(z.object({
+        plan: z.enum(["solo", "team"]),
+        amount: z.number(),
+        paymentMethod: z.enum(["mtn_momo", "airtel_money", "cash", "whatsapp", "other"]),
+        transactionRef: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const requestId = await db.createPaymentRequest({
+          userId: ctx.user.id,
+          userPhone: ctx.user.phone || "",
+          userName: ctx.user.name,
+          plan: input.plan,
+          amount: input.amount,
+          paymentMethod: input.paymentMethod,
+          transactionRef: input.transactionRef,
+        });
+        return { requestId };
+      }),
+
+    /** Get current user's payment requests */
+    myRequests: protectedProcedure.query(async ({ ctx }) => {
+      return db.getUserPaymentRequests(ctx.user.id);
     }),
   }),
 });

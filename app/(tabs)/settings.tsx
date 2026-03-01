@@ -12,8 +12,12 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
+import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { CURRENCIES, formatCurrency } from "@/lib/store";
@@ -22,6 +26,8 @@ import { Language } from "@/lib/i18n";
 export default function SettingsScreen() {
   const { state, updateProfile, setLanguage, addCategory, deleteCategory, translate } = useApp();
   const colors = useColors();
+  const router = useRouter();
+  const { user, logout, isAuthenticated } = useAuth();
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -31,18 +37,41 @@ export default function SettingsScreen() {
   const [nameInput, setNameInput] = useState(state.profile.name);
   const [businessInput, setBusinessInput] = useState(state.profile.businessName);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const headers = "Date,Type,Category,Amount,Description\n";
     const rows = state.transactions
       .map((tx) => {
         const cat = state.categories.find((c) => c.id === tx.categoryId);
-        const catName = cat?.isCustom ? cat.nameKey : translate((cat?.nameKey || "") as any);
+        const catName = cat ? (cat.nameKey.startsWith("custom_") ? cat.nameKey.replace("custom_", "") : (cat.isCustom ? cat.nameKey : translate((cat.nameKey || "") as any))) : "";
         const d = new Date(tx.date).toLocaleDateString();
         return `${d},${tx.type},${catName},${tx.amount},"${tx.description}"`;
       })
       .join("\n");
     const csv = headers + rows;
-    Alert.alert(translate("success"), translate("dataExported"));
+    if (Platform.OS === "web") {
+      // Web: download as file
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `business_plus_export_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      Alert.alert(translate("success"), translate("dataExported"));
+    } else {
+      // Native: save to file and share
+      try {
+        const fileUri = FileSystem.documentDirectory + `business_plus_export_${new Date().toISOString().split("T")[0]}.csv`;
+        await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, { mimeType: "text/csv", dialogTitle: translate("exportData") });
+        } else {
+          Alert.alert(translate("success"), translate("dataExported"));
+        }
+      } catch (e) {
+        Alert.alert(translate("error"), "Export failed");
+      }
+    }
   };
 
   const handleAddCategory = () => {
@@ -72,10 +101,29 @@ export default function SettingsScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: Platform.OS === "web",
     });
     if (!result.canceled && result.assets[0]) {
-      updateProfile({ logoUri: result.assets[0].uri });
-      Alert.alert(translate("success"), translate("logoUpdated"));
+      try {
+        let persistentUri = result.assets[0].uri;
+        if (Platform.OS === "web") {
+          // On web, use base64 data URI for persistence
+          if (result.assets[0].base64) {
+            persistentUri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+          }
+        } else {
+          // On native, copy to documentDirectory for persistence across updates
+          const destUri = FileSystem.documentDirectory + "company_logo.jpg";
+          await FileSystem.copyAsync({ from: result.assets[0].uri, to: destUri });
+          persistentUri = destUri;
+        }
+        updateProfile({ logoUri: persistentUri });
+        Alert.alert(translate("success"), translate("logoUpdated"));
+      } catch (e) {
+        // Fallback: use original URI
+        updateProfile({ logoUri: result.assets[0].uri });
+        Alert.alert(translate("success"), translate("logoUpdated"));
+      }
     }
   };
 
@@ -282,6 +330,48 @@ export default function SettingsScreen() {
           icon="doc.text"
           label={translate("exportData")}
           onPress={handleExport}
+        />
+
+        {/* Account & Subscription */}
+        <Text style={[styles.sectionTitle, { color: colors.muted }]}>{translate("subscription")}</Text>
+
+        <SettingRow
+          icon="creditcard.fill"
+          label={translate("subscription")}
+          value={translate("subscriptionPlans")}
+          onPress={() => router.push("/subscription" as any)}
+        />
+
+        <SettingRow
+          icon="building.2.fill"
+          label={translate("companyGroup")}
+          onPress={() => router.push("/company" as any)}
+        />
+
+        {user?.role === "admin" && (
+          <SettingRow
+            icon="shield.fill"
+            label={translate("adminPanel")}
+            onPress={() => router.push("/admin" as any)}
+          />
+        )}
+
+        <SettingRow
+          icon="rectangle.portrait.and.arrow.right"
+          label={translate("logout")}
+          onPress={() => {
+            Alert.alert(translate("confirm"), translate("logoutConfirm"), [
+              { text: translate("cancel"), style: "cancel" },
+              {
+                text: translate("logout"),
+                style: "destructive",
+                onPress: async () => {
+                  await logout();
+                  router.replace("/login" as any);
+                },
+              },
+            ]);
+          }}
         />
 
         {/* About */}

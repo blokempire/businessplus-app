@@ -129,7 +129,15 @@ export async function getMe(): Promise<{
   openId: string;
   name: string | null;
   email: string | null;
+  phone: string | null;
   loginMethod: string | null;
+  role: string;
+  status: string;
+  subscriptionPlan: string;
+  subscriptionActive: boolean;
+  subscriptionEndDate: string | null;
+  companyId: number | null;
+  companyRole: string | null;
   lastSignedIn: string;
 } | null> {
   try {
