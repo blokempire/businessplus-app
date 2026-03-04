@@ -1,0 +1,24 @@
+{
+  "query": "SELECT id, phone, role, status, name FROM users WHERE phone LIKE '%184503%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3R1ZUhNPHAtVyPZ.root --database 4AVc6trNL7URWbRWT6TXqa --execute SELECT id, phone, role, status, name FROM users WHERE phone LIKE '%184503%';",
+  "rows": [
+    {
+      "id": "1",
+      "phone": "056184503",
+      "role": "admin",
+      "status": "active",
+      "name": "Doucoure"
+    },
+    {
+      "id": "60004",
+      "phone": "+24256184503",
+      "role": "user",
+      "status": "active",
+      "name": "Doucoure"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tphone\trole\tstatus\tname\n1\t056184503\tadmin\tactive\tDoucoure\n60004\t+24256184503\tuser\tactive\tDoucoure\n",
+  "stderr": "",
+  "execution_time_ms": 76
+}

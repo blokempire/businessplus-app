@@ -1,0 +1,16 @@
+{
+  "query": "SELECT CONCAT('id=', id, ' phone=', phone, ' role=', IFNULL(role,'NULL'), ' status=', IFNULL(status,'NULL'), ' name=', IFNULL(name,'NULL')) as info FROM users WHERE phone LIKE '%184503%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3R1ZUhNPHAtVyPZ.root --database 4AVc6trNL7URWbRWT6TXqa --execute SELECT CONCAT('id=', id, ' phone=', phone, ' role=', IFNULL(role,'NULL'), ' status=', IFNULL(status,'NULL'), ' name=', IFNULL(name,'NULL')) as info FROM users WHERE phone LIKE '%184503%';",
+  "rows": [
+    {
+      "info": "id=1 phone=056184503 role=admin status=active name=Doucoure"
+    },
+    {
+      "info": "id=60004 phone=+24256184503 role=user status=active name=Doucoure"
+    }
+  ],
+  "messages": [],
+  "stdout": "info\nid=1 phone=056184503 role=admin status=active name=Doucoure\nid=60004 phone=+24256184503 role=user status=active name=Doucoure\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

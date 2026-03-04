@@ -80,6 +80,8 @@ const MAPPING = {
   "qrcode": "qr-code",
   "message.fill": "chat",
   "rectangle.portrait.and.arrow.right": "logout",
+  "bell.fill": "notifications",
+  "bell.badge.fill": "notifications-active",
 } as IconMapping;
 
 export function IconSymbol({

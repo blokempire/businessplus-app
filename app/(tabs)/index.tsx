@@ -116,6 +116,37 @@ export default function DashboardScreen() {
                   {state.profile.businessName || translate("businessName")}
                 </Text>
               </View>
+              <View style={styles.headerIcons}>
+                <Pressable
+                  onPress={() => router.push("/settings" as any)}
+                  style={({ pressed }) => [styles.headerIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <IconSymbol name="gearshape.fill" size={22} color={colors.muted} />
+                </Pressable>
+                <Pressable
+                  onPress={() => {}}
+                  style={({ pressed }) => [styles.headerIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <View>
+                    <IconSymbol name="bell.fill" size={22} color={colors.muted} />
+                    {(state.debtEntries.length + state.invoices.filter(i => i.status === "pending" || i.status === "partial").length) > 0 && (
+                      <View style={[styles.notifBadge, { backgroundColor: colors.error }]}>
+                        <Text style={styles.notifBadgeText}>
+                          {Math.min(state.debtEntries.length + state.invoices.filter(i => i.status === "pending" || i.status === "partial").length, 99)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </Pressable>
+                {isAdmin && (
+                  <Pressable
+                    onPress={() => router.push("/admin" as any)}
+                    style={({ pressed }) => [styles.headerIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <IconSymbol name="shield.fill" size={22} color={colors.warning} />
+                  </Pressable>
+                )}
+              </View>
             </View>
 
             {/* Balance Card */}
@@ -297,9 +328,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   balanceLabel: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.8)",
-    fontWeight: "500",
+    fontSize: 15,
+    color: "#FFFFFF",
+    fontWeight: "700",
+    textTransform: "uppercase" as const,
+    letterSpacing: 1,
   },
   balanceAmount: {
     fontSize: 36,
@@ -321,9 +354,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   balanceItemLabel: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.8)",
-    fontWeight: "500",
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
   balanceItemAmount: {
     fontSize: 18,
@@ -464,5 +497,29 @@ const styles = StyleSheet.create({
   adminBannerDesc: {
     fontSize: 12,
     marginTop: 2,
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  headerIconBtn: {
+    padding: 8,
+  },
+  notifBadge: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "800",
   },
 });

@@ -78,6 +78,19 @@ export default function CreateInvoiceScreen() {
     );
   };
 
+  const setItemQty = (productId: string, qty: number) => {
+    if (qty <= 0) {
+      setItems(items.filter((i) => i.productId !== productId));
+      return;
+    }
+    setItems(
+      items.map((i) => {
+        if (i.productId !== productId) return i;
+        return { ...i, quantity: qty, total: qty * i.unitPrice };
+      })
+    );
+  };
+
   const handleCreate = () => {
     if (!selectedContact) {
       Alert.alert(translate("error"), translate("selectContact"));
@@ -257,9 +270,17 @@ export default function CreateInvoiceScreen() {
                   >
                     <IconSymbol name="minus" size={16} color={colors.foreground} />
                   </TouchableOpacity>
-                  <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, minWidth: 24, textAlign: "center" }}>
-                    {item.quantity}
-                  </Text>
+                  <TextInput
+                     style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, minWidth: 36, textAlign: "center", paddingVertical: 2, paddingHorizontal: 4, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}
+                     value={String(item.quantity)}
+                     onChangeText={(text) => {
+                       const num = parseInt(text.replace(/[^0-9]/g, ""), 10);
+                       if (!isNaN(num)) setItemQty(item.productId, num);
+                     }}
+                     keyboardType="number-pad"
+                     returnKeyType="done"
+                     selectTextOnFocus
+                   />
                   <TouchableOpacity
                     onPress={() => updateItemQty(item.productId, 1)}
                     style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}

@@ -246,10 +246,10 @@ export default function SettingsScreen() {
               {
                 text: translate("logout"),
                 style: "destructive",
-                onPress: async () => {
-                  await logout();
-                  router.replace("/login" as any);
-                },
+               onPress: async () => {
+                   await logout();
+                   // AuthGate handles redirect to /login automatically
+                 },
               },
             ]);
           }}

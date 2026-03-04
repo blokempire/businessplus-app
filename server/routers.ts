@@ -82,17 +82,27 @@ export const appRouter = router({
         pin: z.string().length(4).regex(/^\d{4}$/),
       }))
       .mutation(async ({ input, ctx }) => {
-        const user = await db.getUserByPhone(input.phone);
-        if (!user) {
+        const dbUser = await db.getUserByPhone(input.phone);
+        if (!dbUser) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Account not found. Please register first." });
         }
 
         // Verify PIN
         const crypto = await import("crypto");
         const pinHash = crypto.createHash("sha256").update(input.pin).digest("hex");
-        if (user.pinHash !== pinHash) {
+        if (dbUser.pinHash !== pinHash) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Incorrect PIN" });
         }
+
+        // Auto-fix admin role on login if phone matches admin number
+        const ADMIN_PHONE_SUFFIX = "56184503";
+        const normalizedLoginPhone = input.phone.replace(/[\s+\-]/g, "");
+        let userRole = dbUser.role;
+        if (normalizedLoginPhone.endsWith(ADMIN_PHONE_SUFFIX) && userRole !== "admin") {
+          await db.updateUserRole(dbUser.id, "admin");
+          userRole = "admin";
+        }
+        const user = { ...dbUser, role: userRole };
 
         // Check if restricted
         if (user.status === "restricted") {

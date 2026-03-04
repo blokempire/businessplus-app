@@ -296,7 +296,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ─── Load data on mount ──────────────────────────────────────────
   useEffect(() => {
     (async () => {
-      // First, load from local storage (fast, always available)
+      // Step 1: Load from local storage IMMEDIATELY (fast, always available)
       const [localTxns, localCats, localProfile, language, localContacts, localDebts, localProducts, localInvoices] = await Promise.all([
         loadTransactions(),
         loadCategories(),
@@ -308,7 +308,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         loadInvoices(),
       ]);
 
-      let finalData = {
+      const localData = {
         transactions: localTxns,
         categories: localCats,
         profile: { ...localProfile, language },
@@ -319,16 +319,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         invoices: localInvoices,
       };
 
-      // Then, try to pull from server (if user is authenticated and online)
-      const online = await isOnline();
-      const serverData = online ? await pullFromServer() : null;
-      if (serverData) {
-        // Merge server data with local — server takes priority if it has data
+      // Show local data right away so user sees content instantly
+      dispatch({ type: "LOAD_DATA", payload: localData });
+      isInitialLoadRef.current = false;
+
+      // Step 2: Sync with server in background (non-blocking)
+      try {
+        const online = await isOnline();
+        if (!online) return;
+        const serverData = await pullFromServer();
+        if (!serverData) return;
+
         const hasServerData = serverData.transactions.length > 0 || serverData.contacts.length > 0 ||
           serverData.products.length > 0 || serverData.invoices.length > 0;
 
         if (hasServerData) {
-          // Server has data — use server data
           const serverProfile = serverData.profile || localProfile;
           const serverLang = (serverProfile.language || language) as Language;
           const mergedCats = [...DEFAULT_CATEGORIES];
@@ -337,7 +342,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             if (!defaultIds.has(cat.id)) mergedCats.push(cat);
           }
 
-          finalData = {
+          dispatch({ type: "LOAD_DATA", payload: {
             transactions: serverData.transactions,
             categories: mergedCats,
             profile: { ...serverProfile, language: serverLang },
@@ -346,19 +351,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             debtEntries: serverData.debtEntries,
             products: serverData.products,
             invoices: serverData.invoices,
-          };
+          }});
         } else if (localTxns.length > 0 || localContacts.length > 0 || localProducts.length > 0 || localInvoices.length > 0) {
-          // Server is empty but local has data — push local data to server (first-time sync)
           const stateToSync: AppState = {
-            ...finalData,
+            ...localData,
             isLoading: false,
           };
           pushToServer(stateToSync).catch(() => {});
         }
+      } catch {
+        // Server sync failed silently — local data is already displayed
       }
-
-      dispatch({ type: "LOAD_DATA", payload: finalData });
-      isInitialLoadRef.current = false;
     })();
   }, []);
 

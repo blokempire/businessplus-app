@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, phone, role, status, name, created_at FROM users WHERE phone LIKE '%184503%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3R1ZUhNPHAtVyPZ.root --database 4AVc6trNL7URWbRWT6TXqa --execute SELECT id, phone, role, status, name, created_at FROM users WHERE phone LIKE '%184503%';",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'created_at' in 'field list'"
+  ]
+}

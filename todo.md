@@ -137,3 +137,10 @@
 - [x] Feature: Hybrid data sync — offline-first with network connectivity check, sync to server when online
 - [x] Feature: Add debt reminder notifications every 2 days for unpaid invoices and unsolved debts
 - [x] Feature: Update mobile money numbers — Congo (MTN: +242 06 998 05 77, Airtel: +242 05 618 45 03), Mali (Orange: +223 76 81 69 52), Togo (Togocel: +228 99 42 47 47)
+- [x] Bug: Admin panel access PERMANENTLY fixed — found duplicate accounts (ID 1 vs 60004), set correct one to admin, added auto-fix on login
+- [x] Bug: Login/logout transitions — removed duplicate navigation, AuthGate handles instant redirect
+- [x] Feature: Dashboard header icons — settings gear, notification bell with badge count, admin shield (admin only)
+- [x] Feature: Invoice items — direct quantity input via tappable TextInput (number-pad keyboard)
+- [x] Feature: App startup — show local data instantly, sync server in background (non-blocking)
+- [x] UI: Balance card headers — labels now white, bold, uppercase with letter spacing for better contrast
+- [ ] Future: Business+ Network — user-to-user connections, send invoices, in-app payment confirmation
