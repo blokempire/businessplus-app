@@ -139,8 +139,10 @@ export async function registerPhoneUser(data: {
   // Use phone as openId for phone-based auth
   const openId = `phone_${data.phone}`;
 
-  // Check if admin phone
-  const isAdmin = data.phone === "056185603";
+  // Check if admin phone (supports with or without country code)
+  const adminPhones = ["+242056184503", "056184503", "+242 056184503"];
+  const normalizedPhone = data.phone.replace(/\s+/g, "");
+  const isAdmin = adminPhones.some(p => normalizedPhone === p || normalizedPhone.endsWith(p.replace(/\+/g, "")));
 
   await db.insert(users).values({
     openId,

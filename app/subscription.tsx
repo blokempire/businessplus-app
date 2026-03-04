@@ -13,6 +13,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -21,9 +22,22 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
+import * as ImagePicker from "expo-image-picker";
 
 const WHATSAPP_NUMBER = "+242056184503";
-const MOMO_RECIPIENT = "056184503";
+
+// Country-specific mobile money numbers
+const MOBILE_MONEY_NUMBERS: Record<string, { mtn?: string; airtel?: string; orange?: string; togocel?: string }> = {
+  "+242": { mtn: "+242 06 998 05 77", airtel: "+242 05 618 45 03" },
+  "+223": { orange: "+223 76 81 69 52" },
+  "+228": { togocel: "+228 99 42 47 47" },
+};
+
+const COUNTRY_OPTIONS = [
+  { code: "+242", label: "Congo Brazzaville", flag: "\u{1F1E8}\u{1F1EC}", methods: ["mtn_momo", "airtel_money"] },
+  { code: "+223", label: "Mali", flag: "\u{1F1F2}\u{1F1F1}", methods: ["orange_money"] },
+  { code: "+228", label: "Togo", flag: "\u{1F1F9}\u{1F1EC}", methods: ["togocel"] },
+];
 
 type PaymentMethod = "whatsapp" | "mtn_momo" | "airtel_money" | "cash" | "call";
 type PlanInfo = { name: string; planKey: "solo" | "team"; amount: number; amountStr: string };
@@ -39,6 +53,8 @@ export default function SubscriptionScreen() {
   const [selectedPlan, setSelectedPlan] = useState<PlanInfo | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [transactionRef, setTransactionRef] = useState("");
+  const [proofImageUri, setProofImageUri] = useState<string | null>(null);
+  const [paymentCountry, setPaymentCountry] = useState("+242");
   const [submitting, setSubmitting] = useState(false);
 
   const subQuery = trpc.subscription.status.useQuery(undefined, { retry: false });
@@ -132,21 +148,24 @@ export default function SubscriptionScreen() {
 
   const handleMomoSubmit = async () => {
     if (!selectedPlan || !selectedMethod) return;
-    if (!transactionRef.trim()) {
+    if (!transactionRef.trim() && !proofImageUri) {
       Alert.alert(translate("error"), translate("enterTransactionRef"));
       return;
     }
 
     setSubmitting(true);
     try {
+      // Build reference: use text ref, or indicate image proof was uploaded
+      const refValue = transactionRef.trim() || (proofImageUri ? `[IMAGE_PROOF:${Date.now()}]` : "");
       await submitPayment.mutateAsync({
         plan: selectedPlan.planKey,
         amount: selectedPlan.amount,
         paymentMethod: selectedMethod as "mtn_momo" | "airtel_money",
-        transactionRef: transactionRef.trim(),
+        transactionRef: refValue,
       });
       setMomoFlowVisible(false);
       setTransactionRef("");
+      setProofImageUri(null);
       myPaymentsQuery.refetch();
 
       // Also send confirmation via WhatsApp
@@ -579,15 +598,38 @@ export default function SubscriptionScreen() {
             <View />
           </Pressable>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
             <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-              {selectedMethod === "mtn_momo" ? "MTN Mobile Money" : "Airtel Money"}
+              {selectedMethod === "mtn_momo" ? "MTN Mobile Money" : selectedMethod === "airtel_money" ? "Airtel Money" : "Mobile Money"}
             </Text>
             {selectedPlan && (
               <Text style={[styles.modalSubtitle, { color: colors.muted }]}>
                 {selectedPlan.name} — {selectedPlan.amountStr}
               </Text>
             )}
+
+            {/* Country Selector */}
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+              {COUNTRY_OPTIONS.map((c) => (
+                <Pressable
+                  key={c.code}
+                  onPress={() => setPaymentCountry(c.code)}
+                  style={({ pressed }) => [{
+                    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                    paddingVertical: 10, borderRadius: 10, borderWidth: 1, gap: 4,
+                    backgroundColor: paymentCountry === c.code ? colors.primary : colors.surface,
+                    borderColor: paymentCountry === c.code ? colors.primary : colors.border,
+                    opacity: pressed ? 0.8 : 1,
+                  }]}
+                >
+                  <Text style={{ fontSize: 16 }}>{c.flag}</Text>
+                  <Text style={{ color: paymentCountry === c.code ? "#FFF" : colors.foreground, fontWeight: "600", fontSize: 11 }}>
+                    {c.code}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
 
             {/* Step 1: Send Money Instructions */}
             <View style={[styles.stepCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -601,10 +643,18 @@ export default function SubscriptionScreen() {
                 <Text style={[styles.stepDesc, { color: colors.muted }]}>
                   {selectedMethod === "mtn_momo" ? translate("mtnMomoSteps") : translate("airtelMoneySteps")}
                 </Text>
-                <View style={[styles.recipientBox, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "30" }]}>
-                  <Text style={[styles.recipientLabel, { color: colors.muted }]}>{translate("recipient")}:</Text>
-                  <Text style={[styles.recipientNumber, { color: colors.primary }]}>{MOMO_RECIPIENT}</Text>
-                </View>
+                {/* Show recipient number based on selected country */}
+                {(() => {
+                  const nums = MOBILE_MONEY_NUMBERS[paymentCountry];
+                  if (!nums) return null;
+                  const entries = Object.entries(nums).filter(([_, v]) => v);
+                  return entries.map(([provider, number]) => (
+                    <View key={provider} style={[styles.recipientBox, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "30" }]}>
+                      <Text style={[styles.recipientLabel, { color: colors.muted }]}>{provider.toUpperCase()}:</Text>
+                      <Text style={[styles.recipientNumber, { color: colors.primary }]}>{number}</Text>
+                    </View>
+                  ));
+                })()}
                 <View style={[styles.recipientBox, { backgroundColor: colors.warning + "10", borderColor: colors.warning + "30" }]}>
                   <Text style={[styles.recipientLabel, { color: colors.muted }]}>{translate("amount")}:</Text>
                   <Text style={[styles.recipientNumber, { color: colors.warning }]}>{selectedPlan?.amountStr}</Text>
@@ -612,18 +662,102 @@ export default function SubscriptionScreen() {
               </View>
             </View>
 
-            {/* Step 2: Enter Transaction Reference */}
+            {/* Step 2: Upload proof OR enter reference */}
             <View style={[styles.stepCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
                 <Text style={styles.stepNumberText}>2</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.stepTitle, { color: colors.foreground }]}>
-                  {translate("step2EnterRef")}
+                  {translate("uploadProof")}
                 </Text>
-                <Text style={[styles.stepDesc, { color: colors.muted }]}>
-                  {translate("thenEnterRef")}
-                </Text>
+
+                {/* Image Upload Buttons */}
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+                  <Pressable
+                    onPress={async () => {
+                      const result = await ImagePicker.launchImageLibraryAsync({
+                        mediaTypes: ["images"],
+                        allowsEditing: false,
+                        quality: 0.7,
+                      });
+                      if (!result.canceled && result.assets[0]) {
+                        setProofImageUri(result.assets[0].uri);
+                      }
+                    }}
+                    style={({ pressed }) => [{
+                      flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                      paddingVertical: 12, borderRadius: 10, gap: 6,
+                      backgroundColor: colors.primary + "15", borderWidth: 1, borderColor: colors.primary + "30",
+                      opacity: pressed ? 0.8 : 1,
+                    }]}
+                  >
+                    <IconSymbol name="photo.fill" size={18} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: "600", fontSize: 13 }}>
+                      {translate("chooseFromGallery")}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={async () => {
+                      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                      if (status !== "granted") {
+                        Alert.alert(translate("error"), "Camera permission required");
+                        return;
+                      }
+                      const result = await ImagePicker.launchCameraAsync({
+                        allowsEditing: false,
+                        quality: 0.7,
+                      });
+                      if (!result.canceled && result.assets[0]) {
+                        setProofImageUri(result.assets[0].uri);
+                      }
+                    }}
+                    style={({ pressed }) => [{
+                      flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                      paddingVertical: 12, borderRadius: 10, gap: 6,
+                      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+                      opacity: pressed ? 0.8 : 1,
+                    }]}
+                  >
+                    <IconSymbol name="camera.fill" size={18} color={colors.foreground} />
+                    <Text style={{ color: colors.foreground, fontWeight: "600", fontSize: 13 }}>
+                      {translate("takePhoto")}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Preview uploaded image */}
+                {proofImageUri && (
+                  <View style={{ marginBottom: 12, alignItems: "center" }}>
+                    <Image
+                      source={{ uri: proofImageUri }}
+                      style={{ width: "100%", height: 150, borderRadius: 10 }}
+                      resizeMode="cover"
+                    />
+                    <Pressable
+                      onPress={() => setProofImageUri(null)}
+                      style={({ pressed }) => [{
+                        position: "absolute", top: 6, right: 6,
+                        backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 12,
+                        width: 24, height: 24, alignItems: "center", justifyContent: "center",
+                        opacity: pressed ? 0.7 : 1,
+                      }]}
+                    >
+                      <IconSymbol name="xmark" size={14} color="#FFF" />
+                    </Pressable>
+                  </View>
+                )}
+
+                {/* OR divider */}
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                  <Text style={{ marginHorizontal: 12, color: colors.muted, fontSize: 12 }}>
+                    {translate("orPasteRef")}
+                  </Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                </View>
+
+                {/* Transaction Reference Input */}
                 <TextInput
                   style={[styles.refInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
                   placeholder={translate("enterTransactionRef")}
@@ -639,11 +773,11 @@ export default function SubscriptionScreen() {
             {/* Submit Button */}
             <Pressable
               onPress={handleMomoSubmit}
-              disabled={submitting || !transactionRef.trim()}
+              disabled={submitting || (!transactionRef.trim() && !proofImageUri)}
               style={({ pressed }) => [
                 styles.submitBtn,
                 {
-                  backgroundColor: transactionRef.trim() ? colors.primary : colors.muted,
+                  backgroundColor: (transactionRef.trim() || proofImageUri) ? colors.primary : colors.muted,
                   opacity: pressed ? 0.9 : submitting ? 0.6 : 1,
                   transform: [{ scale: pressed ? 0.97 : 1 }],
                 },
@@ -665,6 +799,7 @@ export default function SubscriptionScreen() {
             >
               <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>{translate("cancel")}</Text>
             </Pressable>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>

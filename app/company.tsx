@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Text,
   View,
@@ -9,7 +9,6 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
-  FlatList,
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
@@ -27,13 +26,10 @@ export default function CompanyScreen() {
   const colors = useColors();
   const router = useRouter();
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [companyName, setCompanyName] = useState("");
   const [invitePhone, setInvitePhone] = useState("");
+  const [countryCode, setCountryCode] = useState("+242");
   const [inviteRole, setInviteRole] = useState<CompanyRole>("cashier");
-  const [creating, setCreating] = useState(false);
-  const [inviting, setInviting] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -43,18 +39,7 @@ export default function CompanyScreen() {
   const company = companyQuery.data;
   const pendingInvitations = pendingQuery.data || [];
 
-  const createMutation = trpc.company.create.useMutation({
-    onSuccess: () => {
-      Alert.alert(translate("success"), translate("companyCreated"));
-      setShowCreateModal(false);
-      setCompanyName("");
-      utils.company.info.invalidate();
-    },
-    onError: (err: any) => {
-      Alert.alert(translate("error"), err.message);
-    },
-  });
-
+  // Auto-create company when user first invites (no separate "create" step)
   const inviteMutation = trpc.company.invite.useMutation({
     onSuccess: () => {
       Alert.alert(translate("success"), translate("invitationSent"));
@@ -97,20 +82,17 @@ export default function CompanyScreen() {
     },
   });
 
-  const handleCreate = () => {
-    if (!companyName.trim()) return;
-    createMutation.mutate({ name: companyName.trim() });
-  };
-
   const handleInvite = () => {
-    if (!invitePhone.trim()) return;
-    inviteMutation.mutate({ phone: invitePhone.trim(), role: inviteRole });
+    const rawPhone = invitePhone.replace(/\s+/g, "").replace(/^0+/, "");
+    if (!rawPhone) return;
+    const fullPhone = `${countryCode}${rawPhone}`;
+    inviteMutation.mutate({ phone: fullPhone, role: inviteRole });
   };
 
   const handleRemoveMember = (memberId: number, memberName: string) => {
     Alert.alert(
       translate("removeMember"),
-      `${translate("removeMemberConfirm")} ${memberName}?`,
+      `${translate("removeMemberConfirm")}`,
       [
         { text: translate("cancel"), style: "cancel" },
         {
@@ -142,8 +124,14 @@ export default function CompanyScreen() {
   };
 
   const hasCompany = company && company.company;
-  const isOwner = hasCompany ? company.company.ownerId === (company.members?.find((m: any) => m.companyRole === "owner")?.id ?? -1) : false;
+  const isOwner = hasCompany && company.members?.some((m: any) => m.companyRole === "owner" && m.id === company.company.ownerId);
   const members = company?.members || [];
+
+  const countryCodes = [
+    { code: "+242", label: "🇨🇬 Congo", flag: "🇨🇬" },
+    { code: "+223", label: "🇲🇱 Mali", flag: "🇲🇱" },
+    { code: "+228", label: "🇹🇬 Togo", flag: "🇹🇬" },
+  ];
 
   return (
     <ScreenContainer edges={["top", "left", "right"]} className="flex-1">
@@ -162,7 +150,7 @@ export default function CompanyScreen() {
           <View style={{ width: 24 }} />
         </View>
 
-        {/* Pending Invitations */}
+        {/* Pending Invitations from others */}
         {pendingInvitations.length > 0 && (
           <View style={{ marginBottom: 20 }}>
             <Text style={[styles.sectionTitle, { color: colors.warning }]}>
@@ -205,16 +193,24 @@ export default function CompanyScreen() {
 
         {hasCompany ? (
           <>
-            {/* Company Info */}
+            {/* Team Info Card */}
             <View style={[styles.companyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={[styles.companyIconBg, { backgroundColor: colors.primary + "20" }]}>
-                <IconSymbol name="building.2.fill" size={32} color={colors.primary} />
+                <IconSymbol name="person.3.fill" size={32} color={colors.primary} />
               </View>
               <Text style={[styles.companyName, { color: colors.foreground }]}>
                 {company.company.name}
               </Text>
               <Text style={[styles.companyMeta, { color: colors.muted }]}>
                 {members.length}/{company.company.maxMembers} {translate("members")}
+              </Text>
+            </View>
+
+            {/* Permissions Info */}
+            <View style={[styles.permissionsCard, { backgroundColor: colors.primary + "08", borderColor: colors.primary + "30" }]}>
+              <IconSymbol name="info.circle" size={18} color={colors.primary} />
+              <Text style={[styles.permissionsText, { color: colors.muted }]}>
+                {translate("teamDescription")}
               </Text>
             </View>
 
@@ -233,6 +229,9 @@ export default function CompanyScreen() {
                   <Text style={[styles.memberName, { color: colors.foreground }]}>
                     {member.name || `User #${member.id}`}
                   </Text>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                    {member.phone || ""}
+                  </Text>
                   <View style={[styles.roleBadge, { backgroundColor: getRoleColor(member.companyRole) + "20" }]}>
                     <Text style={[styles.roleBadgeText, { color: getRoleColor(member.companyRole) }]}>
                       {getRoleLabel(member.companyRole)}
@@ -250,7 +249,7 @@ export default function CompanyScreen() {
               </View>
             ))}
 
-            {/* Invite Button */}
+            {/* Invite Button — only for owner */}
             {isOwner && members.length < (company.company.maxMembers || 5) && (
               <Pressable
                 onPress={() => setShowInviteModal(true)}
@@ -259,16 +258,16 @@ export default function CompanyScreen() {
                   { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
                 ]}
               >
-                <IconSymbol name="plus.circle.fill" size={22} color="#FFF" />
+                <IconSymbol name="person.crop.circle.badge.plus" size={22} color="#FFF" />
                 <Text style={styles.inviteBtnText}>{translate("inviteMember")}</Text>
               </Pressable>
             )}
           </>
         ) : (
-          /* No Company — Create or Wait */
+          /* No Team Yet — Invite to get started */
           <View style={styles.emptyState}>
             <View style={[styles.emptyIconBg, { backgroundColor: colors.primary + "15" }]}>
-              <IconSymbol name="building.2.fill" size={48} color={colors.primary} />
+              <IconSymbol name="person.3.fill" size={48} color={colors.primary} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
               {translate("noCompany")}
@@ -276,65 +275,37 @@ export default function CompanyScreen() {
             <Text style={[styles.emptyDesc, { color: colors.muted }]}>
               {translate("noCompanyDesc")}
             </Text>
+
+            {/* Permission explanation */}
+            <View style={[styles.permCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.permRow}>
+                <IconSymbol name="crown.fill" size={16} color={colors.primary} />
+                <Text style={[styles.permText, { color: colors.foreground }]}>
+                  {translate("ownerPermissions")}
+                </Text>
+              </View>
+              <View style={[styles.permDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.permRow}>
+                <IconSymbol name="person.fill" size={16} color={colors.muted} />
+                <Text style={[styles.permText, { color: colors.muted }]}>
+                  {translate("memberPermissions")}
+                </Text>
+              </View>
+            </View>
+
             <Pressable
-              onPress={() => setShowCreateModal(true)}
+              onPress={() => setShowInviteModal(true)}
               style={({ pressed }) => [
                 styles.createBtn,
                 { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
               ]}
             >
-              <IconSymbol name="plus.circle.fill" size={22} color="#FFF" />
-              <Text style={styles.createBtnText}>{translate("createCompany")}</Text>
+              <IconSymbol name="person.crop.circle.badge.plus" size={22} color="#FFF" />
+              <Text style={styles.createBtnText}>{translate("inviteMember")}</Text>
             </Pressable>
           </View>
         )}
       </ScrollView>
-
-      {/* Create Company Modal */}
-      <Modal visible={showCreateModal} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-                  {translate("createCompany")}
-                </Text>
-                <Pressable onPress={() => setShowCreateModal(false)} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
-                  <IconSymbol name="xmark" size={24} color={colors.foreground} />
-                </Pressable>
-              </View>
-              <View style={styles.modalBody}>
-                <Text style={[styles.inputLabel, { color: colors.muted }]}>
-                  {translate("companyName")}
-                </Text>
-                <TextInput
-                  style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
-                  value={companyName}
-                  onChangeText={setCompanyName}
-                  placeholder={translate("companyName")}
-                  placeholderTextColor={colors.muted}
-                  returnKeyType="done"
-                  onSubmitEditing={handleCreate}
-                />
-                <Pressable
-                  onPress={handleCreate}
-                  style={({ pressed }) => [
-                    styles.modalBtn,
-                    { backgroundColor: colors.primary, opacity: pressed || createMutation.isPending ? 0.7 : 1 },
-                  ]}
-                  disabled={createMutation.isPending}
-                >
-                  {createMutation.isPending ? (
-                    <ActivityIndicator color="#FFF" />
-                  ) : (
-                    <Text style={styles.modalBtnText}>{translate("create")}</Text>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* Invite Member Modal */}
       <Modal visible={showInviteModal} animationType="slide" transparent>
@@ -350,17 +321,54 @@ export default function CompanyScreen() {
                 </Pressable>
               </View>
               <View style={styles.modalBody}>
+                {/* Country Code Selector */}
                 <Text style={[styles.inputLabel, { color: colors.muted }]}>
-                  {translate("phoneNumber")}
+                  {translate("selectCountry")}
                 </Text>
-                <TextInput
-                  style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
-                  value={invitePhone}
-                  onChangeText={setInvitePhone}
-                  placeholder="0XXXXXXXXX"
-                  placeholderTextColor={colors.muted}
-                  keyboardType="phone-pad"
-                />
+                <View style={styles.countryRow}>
+                  {countryCodes.map((c) => (
+                    <Pressable
+                      key={c.code}
+                      onPress={() => setCountryCode(c.code)}
+                      style={({ pressed }) => [
+                        styles.countryBtn,
+                        {
+                          backgroundColor: countryCode === c.code ? colors.primary : colors.surface,
+                          borderColor: countryCode === c.code ? colors.primary : colors.border,
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={{ fontSize: 16 }}>{c.flag}</Text>
+                      <Text style={{
+                        color: countryCode === c.code ? "#FFF" : colors.foreground,
+                        fontWeight: "600",
+                        fontSize: 12,
+                      }}>
+                        {c.code}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Phone Number */}
+                <Text style={[styles.inputLabel, { color: colors.muted, marginTop: 16 }]}>
+                  {translate("inviteByPhone")}
+                </Text>
+                <View style={[styles.phoneRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                  <Text style={[styles.phonePrefix, { color: colors.primary }]}>{countryCode}</Text>
+                  <TextInput
+                    style={[styles.phoneInput, { color: colors.foreground }]}
+                    value={invitePhone}
+                    onChangeText={setInvitePhone}
+                    placeholder="0XXXXXXXXX"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="phone-pad"
+                    returnKeyType="done"
+                  />
+                </View>
+
+                {/* Role Selection */}
                 <Text style={[styles.inputLabel, { color: colors.muted, marginTop: 16 }]}>
                   {translate("selectRole")}
                 </Text>
@@ -384,6 +392,16 @@ export default function CompanyScreen() {
                     </Pressable>
                   ))}
                 </View>
+
+                {/* Role description */}
+                <View style={[styles.roleDesc, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={{ fontSize: 12, color: colors.muted, lineHeight: 18 }}>
+                    {inviteRole === "manager" ? translate("ownerPermissions").replace("manage team, ", "") :
+                     inviteRole === "cashier" ? translate("memberPermissions") :
+                     translate("memberPermissions")}
+                  </Text>
+                </View>
+
                 <Pressable
                   onPress={handleInvite}
                   style={({ pressed }) => [
@@ -433,7 +451,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 24,
+    marginBottom: 16,
     gap: 8,
   },
   companyIconBg: {
@@ -450,6 +468,21 @@ const styles = StyleSheet.create({
   companyMeta: {
     fontSize: 14,
     fontWeight: "500",
+  },
+  permissionsCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginHorizontal: 20,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 8,
+  },
+  permissionsText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
   memberRow: {
     flexDirection: "row",
@@ -539,8 +572,8 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: "center",
-    paddingVertical: 60,
-    paddingHorizontal: 40,
+    paddingVertical: 40,
+    paddingHorizontal: 30,
     gap: 12,
   },
   emptyIconBg: {
@@ -552,7 +585,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
     textAlign: "center",
   },
@@ -560,6 +593,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     lineHeight: 20,
+  },
+  permCard: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginTop: 16,
+    gap: 12,
+  },
+  permRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  permText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  permDivider: {
+    height: 1,
   },
   createBtn: {
     flexDirection: "row",
@@ -569,7 +623,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     borderRadius: 14,
     gap: 8,
-    marginTop: 8,
+    marginTop: 16,
   },
   createBtnText: {
     color: "#FFF",
@@ -607,17 +661,42 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
   },
-  input: {
-    fontSize: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+  countryRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  countryBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+  },
+  phoneRow: {
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 12,
     borderWidth: 1,
+    paddingHorizontal: 16,
+  },
+  phonePrefix: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginRight: 8,
+  },
+  phoneInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 14,
   },
   roleSelector: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 24,
+    marginBottom: 8,
   },
   roleOption: {
     flex: 1,
@@ -626,11 +705,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
   },
+  roleDesc: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
   modalBtn: {
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 12,
   },
   modalBtnText: {
     color: "#FFF",

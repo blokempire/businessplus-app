@@ -128,3 +128,12 @@
 - [x] Feature: Duplicate payment prevention (block if pending request exists for same plan)
 - [x] Feature: i18n translations for all payment features (EN + FR)
 - [x] Feature: Sync all business data to server database (transactions, contacts, stock, invoices) — server sync with local fallback
+- [ ] Bug: Published web app shows "Not Found" on ledgerapp-4avc6trn.manus.space
+- [x] Feature: Build landing page for businessplus24.com with app branding and download links
+- [x] Bug: Fix auth page to dashboard transition animation/bug (removed duplicate navigation, let AuthGate handle it)
+- [x] Bug: Fix admin panel access (user: +242 056184503, pin: 8121) — updated admin phone check and set role in DB
+- [x] Feature: Redesign company group — invite team members by mobile number to shared account (owner: full control incl delete/subscriptions/remove members; team: view+add only)
+- [x] Feature: Mobile money proof — allow image upload (gallery/camera) OR paste transaction reference
+- [x] Feature: Hybrid data sync — offline-first with network connectivity check, sync to server when online
+- [x] Feature: Add debt reminder notifications every 2 days for unpaid invoices and unsolved debts
+- [x] Feature: Update mobile money numbers — Congo (MTN: +242 06 998 05 77, Airtel: +242 05 618 45 03), Mali (Orange: +223 76 81 69 52), Togo (Togocel: +228 99 42 47 47)

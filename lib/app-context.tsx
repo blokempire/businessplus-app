@@ -34,6 +34,17 @@ import { Language, getStoredLanguage, setStoredLanguage, t, TranslationKey } fro
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
 import { Platform } from "react-native";
+import * as Network from "expo-network";
+
+async function isOnline(): Promise<boolean> {
+  try {
+    if (Platform.OS === "web") return navigator.onLine;
+    const state = await Network.getNetworkStateAsync();
+    return state.isConnected === true && state.isInternetReachable !== false;
+  } catch {
+    return true; // assume online if check fails
+  }
+}
 
 // ─── State ───────────────────────────────────────────────────────────
 
@@ -308,8 +319,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         invoices: localInvoices,
       };
 
-      // Then, try to pull from server (if user is authenticated)
-      const serverData = await pullFromServer();
+      // Then, try to pull from server (if user is authenticated and online)
+      const online = await isOnline();
+      const serverData = online ? await pullFromServer() : null;
       if (serverData) {
         // Merge server data with local — server takes priority if it has data
         const hasServerData = serverData.transactions.length > 0 || serverData.contacts.length > 0 ||
@@ -361,11 +373,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveProducts(state.products);
     saveInvoices(state.invoices);
 
-    // Debounced server sync — push after 2 seconds of inactivity
+    // Debounced server sync — push after 2 seconds of inactivity, only if online
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(() => {
+    syncTimerRef.current = setTimeout(async () => {
       if (!isInitialLoadRef.current) {
-        pushToServer(state).catch(() => {});
+        const online = await isOnline();
+        if (online) {
+          pushToServer(state).catch(() => {});
+        }
       }
     }, 2000);
   }, [state.transactions, state.categories, state.profile, state.contacts, state.debtEntries, state.products, state.invoices, state.isLoading]);

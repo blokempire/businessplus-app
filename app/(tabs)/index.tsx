@@ -7,9 +7,13 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { calculateTotals, formatCurrency, filterTransactionsByPeriod, Transaction } from "@/lib/store";
 import { useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useDebtReminders } from "@/hooks/use-debt-reminders";
 
 export default function DashboardScreen() {
   const { state, translate } = useApp();
+
+  // Schedule debt reminder notifications every 2 days
+  useDebtReminders(state.debtEntries, state.invoices, translate as (key: string) => string);
   const colors = useColors();
   const router = useRouter();
   const { user } = useAuth();

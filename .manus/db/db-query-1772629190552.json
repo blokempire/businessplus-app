@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, openId, phone, role, name FROM users WHERE phone LIKE '%056184503%' OR phone LIKE '%242056184503%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3R1ZUhNPHAtVyPZ.root --database 4AVc6trNL7URWbRWT6TXqa --execute SELECT id, openId, phone, role, name FROM users WHERE phone LIKE '%056184503%' OR phone LIKE '%242056184503%';",
+  "rows": [
+    {
+      "id": "1",
+      "openId": "phone_056184503",
+      "phone": "056184503",
+      "role": "user",
+      "name": "Doucoure"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\topenId\tphone\trole\tname\n1\tphone_056184503\t056184503\tuser\tDoucoure\n",
+  "stderr": "",
+  "execution_time_ms": 1282
+}

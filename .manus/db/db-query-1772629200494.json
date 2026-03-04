@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE users SET role = 'admin' WHERE phone LIKE '%056184503%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3R1ZUhNPHAtVyPZ.root --database 4AVc6trNL7URWbRWT6TXqa --execute UPDATE users SET role = 'admin' WHERE phone LIKE '%056184503%';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 210
+}

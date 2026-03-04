@@ -113,11 +113,7 @@ export default function LoginScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      router.replace("/(tabs)" as any);
-    }
-  }, [isAuthenticated, authLoading]);
+  // Auth redirect is handled by AuthGate — no duplicate navigation needed here
 
   const fullPhone = `${countryCode}${phone.replace(/^0+/, "")}`;
 
@@ -133,7 +129,7 @@ export default function LoginScreen() {
       await Auth.setSessionToken(result.sessionToken);
       await Auth.setUserInfo(buildUserInfo(result));
       await refresh();
-      router.replace("/(tabs)" as any);
+      // AuthGate handles redirect to /(tabs) automatically
     } catch (err: any) {
       const msg = err?.message || translate("loginError");
       Alert.alert(translate("error"), msg);
@@ -167,7 +163,7 @@ export default function LoginScreen() {
       updateProfile({ currency: detectedCurrency });
       setLanguage(detectedLanguage);
       await refresh();
-      router.replace("/(tabs)" as any);
+      // AuthGate handles redirect to /(tabs) automatically
     } catch (err: any) {
       const msg = err?.message || translate("registerError");
       Alert.alert(translate("error"), msg);
