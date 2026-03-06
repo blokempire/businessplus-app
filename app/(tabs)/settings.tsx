@@ -27,15 +27,19 @@ export default function SettingsScreen() {
   const { state, updateProfile, setLanguage, addCategory, deleteCategory, translate } = useApp();
   const colors = useColors();
   const router = useRouter();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, setUserDirect } = useAuth();
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [newCatType, setNewCatType] = useState<"income" | "expense">("expense");
   const [editingName, setEditingName] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(false);
   const [nameInput, setNameInput] = useState(state.profile.name);
   const [businessInput, setBusinessInput] = useState(state.profile.businessName);
+  const [addressInput, setAddressInput] = useState(state.profile.businessAddress || "");
+  const [phoneInput, setPhoneInput] = useState(state.profile.businessPhone || "");
 
   const handleExport = async () => {
     const headers = "Date,Type,Category,Amount,Description\n";
@@ -300,6 +304,83 @@ export default function SettingsScreen() {
           />
         )}
 
+        {/* Business Address */}
+        {editingAddress ? (
+          <View style={[styles.editRow, { backgroundColor: colors.surface }]}>
+            <TextInput
+              style={[styles.editInput, { color: colors.foreground, borderColor: colors.border }]}
+              value={addressInput}
+              onChangeText={setAddressInput}
+              placeholder={translate("enterBusinessAddress")}
+              placeholderTextColor={colors.muted}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                updateProfile({ businessAddress: addressInput });
+                setEditingAddress(false);
+              }}
+            />
+            <Pressable
+              onPress={() => {
+                updateProfile({ businessAddress: addressInput });
+                setEditingAddress(false);
+              }}
+              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+            >
+              <IconSymbol name="checkmark" size={24} color={colors.primary} />
+            </Pressable>
+          </View>
+        ) : (
+          <SettingRow
+            icon="mappin"
+            label={translate("businessAddress")}
+            value={state.profile.businessAddress || "\u2014"}
+            onPress={() => {
+              setAddressInput(state.profile.businessAddress || "");
+              setEditingAddress(true);
+            }}
+          />
+        )}
+
+        {/* Business Phone */}
+        {editingPhone ? (
+          <View style={[styles.editRow, { backgroundColor: colors.surface }]}>
+            <TextInput
+              style={[styles.editInput, { color: colors.foreground, borderColor: colors.border }]}
+              value={phoneInput}
+              onChangeText={setPhoneInput}
+              placeholder={translate("enterBusinessPhone")}
+              placeholderTextColor={colors.muted}
+              autoFocus
+              keyboardType="phone-pad"
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                updateProfile({ businessPhone: phoneInput });
+                setEditingPhone(false);
+              }}
+            />
+            <Pressable
+              onPress={() => {
+                updateProfile({ businessPhone: phoneInput });
+                setEditingPhone(false);
+              }}
+              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+            >
+              <IconSymbol name="checkmark" size={24} color={colors.primary} />
+            </Pressable>
+          </View>
+        ) : (
+          <SettingRow
+            icon="phone.fill"
+            label={translate("businessPhone")}
+            value={state.profile.businessPhone || "\u2014"}
+            onPress={() => {
+              setPhoneInput(state.profile.businessPhone || "");
+              setEditingPhone(true);
+            }}
+          />
+        )}
+
         {/* Preferences */}
         <Text style={[styles.sectionTitle, { color: colors.muted }]}>{translate("settings")}</Text>
 
@@ -366,8 +447,9 @@ export default function SettingsScreen() {
                  text: translate("logout"),
                  style: "destructive",
                  onPress: () => {
-                   // Navigate instantly, then clear session in background
-                   router.replace("/login" as any);
+                   // Clear user state instantly — AuthGate will redirect to login
+                   setUserDirect(null);
+                   // Clean up session in background
                    logout();
                  },
               },

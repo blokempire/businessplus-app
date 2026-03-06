@@ -463,6 +463,17 @@ export const translations = {
     expireAllConfirm: "This will expire all overdue subscriptions. Continue?",
     allExpired: "All overdue subscriptions expired",
 
+    // Profile extras
+    businessAddress: "Business Address",
+    businessPhone: "Business Phone",
+    enterBusinessAddress: "Enter business address",
+    enterBusinessPhone: "Enter business phone number",
+    createCompanyFirst: "Create Company",
+    createCompanyPrompt: "Enter your business name to create a company group before inviting members.",
+    otherCountry: "Other",
+    contactViaWhatsAppPayment: "Contact via WhatsApp to arrange payment",
+    whatsAppPaymentDesc: "For users outside Congo, Mali and Togo, contact us via WhatsApp to arrange your subscription payment.",
+
     // Notifications
     notifications: "Notifications",
     noNotifications: "No notifications",
@@ -470,6 +481,7 @@ export const translations = {
     debtOwedNotif: "owes you",
     viewAll: "View All",
     close: "Close",
+    swipeToDismiss: "Swipe to dismiss",
 
     // General
     today: "Today",
@@ -940,13 +952,25 @@ export const translations = {
     expireAllConfirm: "Cela expirera tous les abonnements en retard. Continuer ?",
     allExpired: "Tous les abonnements en retard expirés",
 
+    // Profile extras
+    businessAddress: "Adresse de l'entreprise",
+    businessPhone: "T\u00e9l\u00e9phone de l'entreprise",
+    enterBusinessAddress: "Entrez l'adresse de l'entreprise",
+    enterBusinessPhone: "Entrez le num\u00e9ro de t\u00e9l\u00e9phone",
+    createCompanyFirst: "Cr\u00e9er une entreprise",
+    createCompanyPrompt: "Entrez le nom de votre entreprise pour cr\u00e9er un groupe avant d'inviter des membres.",
+    otherCountry: "Autre",
+    contactViaWhatsAppPayment: "Contacter via WhatsApp pour organiser le paiement",
+    whatsAppPaymentDesc: "Pour les utilisateurs hors du Congo, Mali et Togo, contactez-nous via WhatsApp pour organiser le paiement de votre abonnement.",
+
     // Notifications
     notifications: "Notifications",
     noNotifications: "Aucune notification",
-    unpaidInvoiceNotif: "a une facture impayée",
+    unpaidInvoiceNotif: "a une facture impay\u00e9e",
     debtOwedNotif: "vous doit",
     viewAll: "Voir tout",
     close: "Fermer",
+    swipeToDismiss: "Glisser pour supprimer",
 
     // General
     today: "Aujourd'hui",

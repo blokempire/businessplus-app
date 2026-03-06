@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Text,
   View,
@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   KeyboardAvoidingView,
+  FlatList,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -18,11 +19,12 @@ import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
+import { Linking } from "react-native";
 
 type CompanyRole = "manager" | "cashier" | "viewer";
 
 export default function CompanyScreen() {
-  const { translate } = useApp();
+  const { translate, state } = useApp();
   const colors = useColors();
   const router = useRouter();
 
@@ -39,7 +41,24 @@ export default function CompanyScreen() {
   const company = companyQuery.data;
   const pendingInvitations = pendingQuery.data || [];
 
-  // Auto-create company when user first invites (no separate "create" step)
+  const [showCreateCompanyModal, setShowCreateCompanyModal] = useState(false);
+  const [companyNameInput, setCompanyNameInput] = useState("");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
+
+  const createCompanyMutation = trpc.company.create.useMutation({
+    onSuccess: () => {
+      utils.company.info.invalidate();
+      setShowCreateCompanyModal(false);
+      setCompanyNameInput("");
+      // Now open the invite modal
+      setShowInviteModal(true);
+    },
+    onError: (err: any) => {
+      Alert.alert(translate("error"), err.message);
+    },
+  });
+
   const inviteMutation = trpc.company.invite.useMutation({
     onSuccess: () => {
       Alert.alert(translate("success"), translate("invitationSent"));
@@ -89,6 +108,25 @@ export default function CompanyScreen() {
     inviteMutation.mutate({ phone: fullPhone, role: inviteRole });
   };
 
+  const handleOpenInviteModal = () => {
+    if (!hasCompany) {
+      // Prompt to create company first
+      setCompanyNameInput(state.profile.businessName || "");
+      setShowCreateCompanyModal(true);
+    } else {
+      setShowInviteModal(true);
+    }
+  };
+
+  const handleCreateCompany = () => {
+    const name = companyNameInput.trim();
+    if (!name) {
+      Alert.alert(translate("error"), translate("businessName"));
+      return;
+    }
+    createCompanyMutation.mutate({ name });
+  };
+
   const handleRemoveMember = (memberId: number, memberName: string) => {
     Alert.alert(
       translate("removeMember"),
@@ -127,11 +165,69 @@ export default function CompanyScreen() {
   const isOwner = hasCompany && company.members?.some((m: any) => m.companyRole === "owner" && m.id === company.company.ownerId);
   const members = company?.members || [];
 
-  const countryCodes = [
-    { code: "+242", label: "🇨🇬 Congo", flag: "🇨🇬" },
-    { code: "+223", label: "🇲🇱 Mali", flag: "🇲🇱" },
-    { code: "+228", label: "🇹🇬 Togo", flag: "🇹🇬" },
+  const mainCountryCodes = [
+    { code: "+242", label: "Congo", flag: "🇨🇬" },
+    { code: "+223", label: "Mali", flag: "🇲🇱" },
+    { code: "+228", label: "Togo", flag: "🇹🇬" },
   ];
+
+  const allCountryCodes = [
+    { code: "+242", label: "Congo", flag: "🇨🇬" },
+    { code: "+223", label: "Mali", flag: "🇲🇱" },
+    { code: "+228", label: "Togo", flag: "🇹🇬" },
+    { code: "+1", label: "USA/Canada", flag: "🇺🇸" },
+    { code: "+33", label: "France", flag: "🇫🇷" },
+    { code: "+44", label: "UK", flag: "🇬🇧" },
+    { code: "+225", label: "C\u00f4te d'Ivoire", flag: "🇨🇮" },
+    { code: "+221", label: "S\u00e9n\u00e9gal", flag: "🇸🇳" },
+    { code: "+237", label: "Cameroun", flag: "🇨🇲" },
+    { code: "+241", label: "Gabon", flag: "🇬🇦" },
+    { code: "+243", label: "RD Congo", flag: "🇨🇩" },
+    { code: "+226", label: "Burkina Faso", flag: "🇧🇫" },
+    { code: "+227", label: "Niger", flag: "🇳🇪" },
+    { code: "+229", label: "B\u00e9nin", flag: "🇧🇯" },
+    { code: "+234", label: "Nigeria", flag: "🇳🇬" },
+    { code: "+235", label: "Tchad", flag: "🇹🇩" },
+    { code: "+236", label: "Centrafrique", flag: "🇨🇫" },
+    { code: "+240", label: "Guin\u00e9e \u00c9q.", flag: "🇬🇶" },
+    { code: "+245", label: "Guin\u00e9e-Bissau", flag: "🇬🇼" },
+    { code: "+250", label: "Rwanda", flag: "🇷🇼" },
+    { code: "+251", label: "\u00c9thiopie", flag: "🇪🇹" },
+    { code: "+254", label: "Kenya", flag: "🇰🇪" },
+    { code: "+255", label: "Tanzanie", flag: "🇹🇿" },
+    { code: "+256", label: "Ouganda", flag: "🇺🇬" },
+    { code: "+212", label: "Maroc", flag: "🇲🇦" },
+    { code: "+213", label: "Alg\u00e9rie", flag: "🇩🇿" },
+    { code: "+216", label: "Tunisie", flag: "🇹🇳" },
+    { code: "+220", label: "Gambie", flag: "🇬🇲" },
+    { code: "+224", label: "Guin\u00e9e", flag: "🇬🇳" },
+    { code: "+230", label: "Maurice", flag: "🇲🇺" },
+    { code: "+244", label: "Angola", flag: "🇦🇴" },
+    { code: "+258", label: "Mozambique", flag: "🇲🇿" },
+    { code: "+260", label: "Zambie", flag: "🇿🇲" },
+    { code: "+263", label: "Zimbabwe", flag: "🇿🇼" },
+    { code: "+27", label: "Afrique du Sud", flag: "🇿🇦" },
+    { code: "+32", label: "Belgique", flag: "🇧🇪" },
+    { code: "+34", label: "Espagne", flag: "🇪🇸" },
+    { code: "+39", label: "Italie", flag: "🇮🇹" },
+    { code: "+49", label: "Allemagne", flag: "🇩🇪" },
+    { code: "+86", label: "Chine", flag: "🇨🇳" },
+    { code: "+91", label: "Inde", flag: "🇮🇳" },
+    { code: "+55", label: "Br\u00e9sil", flag: "🇧🇷" },
+    { code: "+971", label: "\u00c9mirats", flag: "🇦🇪" },
+    { code: "+966", label: "Arabie Saoudite", flag: "🇸🇦" },
+    { code: "+90", label: "Turquie", flag: "🇹🇷" },
+    { code: "+81", label: "Japon", flag: "🇯🇵" },
+    { code: "+82", label: "Cor\u00e9e du Sud", flag: "🇰🇷" },
+  ];
+
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch.trim()) return allCountryCodes;
+    const q = countrySearch.toLowerCase();
+    return allCountryCodes.filter(c => c.label.toLowerCase().includes(q) || c.code.includes(q));
+  }, [countrySearch]);
+
+  const isMainCountry = mainCountryCodes.some(c => c.code === countryCode);
 
   return (
     <ScreenContainer edges={["top", "left", "right"]} className="flex-1">
@@ -294,7 +390,7 @@ export default function CompanyScreen() {
             </View>
 
             <Pressable
-              onPress={() => setShowInviteModal(true)}
+              onPress={handleOpenInviteModal}
               style={({ pressed }) => [
                 styles.createBtn,
                 { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
@@ -306,6 +402,109 @@ export default function CompanyScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Create Company Modal */}
+      <Modal visible={showCreateCompanyModal} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                  {translate("createCompanyFirst")}
+                </Text>
+                <Pressable onPress={() => setShowCreateCompanyModal(false)} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
+                  <IconSymbol name="xmark" size={24} color={colors.foreground} />
+                </Pressable>
+              </View>
+              <View style={styles.modalBody}>
+                <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 16, lineHeight: 20 }}>
+                  {translate("createCompanyPrompt")}
+                </Text>
+                <Text style={[styles.inputLabel, { color: colors.muted }]}>
+                  {translate("businessName")}
+                </Text>
+                <View style={[styles.phoneRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                  <TextInput
+                    style={[styles.phoneInput, { color: colors.foreground }]}
+                    value={companyNameInput}
+                    onChangeText={setCompanyNameInput}
+                    placeholder={translate("businessName")}
+                    placeholderTextColor={colors.muted}
+                    returnKeyType="done"
+                    onSubmitEditing={handleCreateCompany}
+                  />
+                </View>
+                <Pressable
+                  onPress={handleCreateCompany}
+                  style={({ pressed }) => [
+                    styles.modalBtn,
+                    { backgroundColor: colors.primary, opacity: pressed || createCompanyMutation.isPending ? 0.7 : 1 },
+                  ]}
+                  disabled={createCompanyMutation.isPending}
+                >
+                  {createCompanyMutation.isPending ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.modalBtnText}>{translate("createCompanyFirst")}</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Country Picker Modal */}
+      <Modal visible={showCountryPicker} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, maxHeight: "70%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                {translate("selectCountry")}
+              </Text>
+              <Pressable onPress={() => { setShowCountryPicker(false); setCountrySearch(""); }} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
+                <IconSymbol name="xmark" size={24} color={colors.foreground} />
+              </Pressable>
+            </View>
+            <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+              <TextInput
+                style={[styles.phoneRow, { borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 }]}
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                placeholder={translate("search")}
+                placeholderTextColor={colors.muted}
+              />
+            </View>
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => {
+                    setCountryCode(item.code);
+                    setShowCountryPicker(false);
+                    setCountrySearch("");
+                  }}
+                  style={({ pressed }) => [{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    gap: 12,
+                    backgroundColor: countryCode === item.code ? colors.primary + "15" : "transparent",
+                    opacity: pressed ? 0.7 : 1,
+                  }]}
+                >
+                  <Text style={{ fontSize: 20 }}>{item.flag}</Text>
+                  <Text style={{ flex: 1, fontSize: 15, color: colors.foreground, fontWeight: "500" }}>{item.label}</Text>
+                  <Text style={{ fontSize: 14, color: colors.muted, fontWeight: "600" }}>{item.code}</Text>
+                  {countryCode === item.code && <IconSymbol name="checkmark" size={18} color={colors.primary} />}
+                </Pressable>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* Invite Member Modal */}
       <Modal visible={showInviteModal} animationType="slide" transparent>
@@ -321,12 +520,12 @@ export default function CompanyScreen() {
                 </Pressable>
               </View>
               <View style={styles.modalBody}>
-                {/* Country Code Selector */}
+                {/* Country Code Selector — main 3 + Other */}
                 <Text style={[styles.inputLabel, { color: colors.muted }]}>
                   {translate("selectCountry")}
                 </Text>
                 <View style={styles.countryRow}>
-                  {countryCodes.map((c) => (
+                  {mainCountryCodes.map((c) => (
                     <Pressable
                       key={c.code}
                       onPress={() => setCountryCode(c.code)}
@@ -349,6 +548,27 @@ export default function CompanyScreen() {
                       </Text>
                     </Pressable>
                   ))}
+                  {/* Other country button */}
+                  <Pressable
+                    onPress={() => setShowCountryPicker(true)}
+                    style={({ pressed }) => [
+                      styles.countryBtn,
+                      {
+                        backgroundColor: !isMainCountry ? colors.primary : colors.surface,
+                        borderColor: !isMainCountry ? colors.primary : colors.border,
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 16 }}>🌍</Text>
+                    <Text style={{
+                      color: !isMainCountry ? "#FFF" : colors.foreground,
+                      fontWeight: "600",
+                      fontSize: 11,
+                    }}>
+                      {!isMainCountry ? countryCode : translate("otherCountry")}
+                    </Text>
+                  </Pressable>
                 </View>
 
                 {/* Phone Number */}

@@ -189,6 +189,8 @@ async function pullFromServer(): Promise<{
       profile: data.profile ? {
         name: data.profile.name || "",
         businessName: data.profile.businessName || "",
+        businessAddress: data.profile.businessAddress || "",
+        businessPhone: data.profile.businessPhone || "",
         currency: data.profile.currency || "XAF",
         language: (data.profile.language || "en") as Language,
         logoUri: data.profile.logoUri || "",

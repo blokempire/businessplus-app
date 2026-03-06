@@ -148,3 +148,10 @@
 - [x] Bug: Logout to login transition is not instant — fix auth flow delay
 - [x] Bug: Invoice quantity input disappears when typing manually
 - [x] Bug: Notification bell doesn't roll out to show notification details
+- [x] Feature: Team invite — support all country codes (default 3 main, allow any other)
+- [x] Feature: WhatsApp payment option for users outside the 3 supported countries
+- [x] Feature: Company creation prompt before first team invite
+- [x] Feature: Add business address and mobile number to profile settings
+- [x] Feature: Notification swipe to dismiss
+- [x] Bug: Login/logout transition still not instant — try different approach (setUserDirect)
+- [ ] Feature: Shared workspace — invited members see principal account data when they accept invitation

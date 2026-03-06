@@ -478,95 +478,172 @@ export default function SubscriptionScreen() {
             </Text>
           )}
 
-          {/* MTN Mobile Money */}
-          <Pressable
-            onPress={() => handlePaymentMethodSelect("mtn_momo")}
-            style={({ pressed }) => [
-              styles.paymentOption,
-              { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
-            ]}
-          >
-            <View style={[styles.paymentIconBg, { backgroundColor: "#FFCC00" + "20" }]}>
-              <Text style={styles.paymentEmoji}>📱</Text>
-            </View>
-            <View style={styles.paymentInfo}>
-              <Text style={[styles.paymentName, { color: colors.foreground }]}>MTN Mobile Money</Text>
-              <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("mtnMomoDesc")}</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-          </Pressable>
+          {/* Country selector for payment */}
+          <View style={{ flexDirection: "row", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+            {COUNTRY_OPTIONS.map((c) => (
+              <Pressable
+                key={c.code}
+                onPress={() => setPaymentCountry(c.code)}
+                style={({ pressed }) => [{
+                  flexDirection: "row", alignItems: "center", paddingVertical: 8, paddingHorizontal: 12,
+                  borderRadius: 10, borderWidth: 1, gap: 4,
+                  backgroundColor: paymentCountry === c.code ? colors.primary : colors.surface,
+                  borderColor: paymentCountry === c.code ? colors.primary : colors.border,
+                  opacity: pressed ? 0.8 : 1,
+                }]}
+              >
+                <Text style={{ fontSize: 14 }}>{c.flag}</Text>
+                <Text style={{ color: paymentCountry === c.code ? "#FFF" : colors.foreground, fontWeight: "600", fontSize: 12 }}>
+                  {c.label}
+                </Text>
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={() => setPaymentCountry("other")}
+              style={({ pressed }) => [{
+                flexDirection: "row", alignItems: "center", paddingVertical: 8, paddingHorizontal: 12,
+                borderRadius: 10, borderWidth: 1, gap: 4,
+                backgroundColor: paymentCountry === "other" ? colors.primary : colors.surface,
+                borderColor: paymentCountry === "other" ? colors.primary : colors.border,
+                opacity: pressed ? 0.8 : 1,
+              }]}
+            >
+              <Text style={{ fontSize: 14 }}>🌍</Text>
+              <Text style={{ color: paymentCountry === "other" ? "#FFF" : colors.foreground, fontWeight: "600", fontSize: 12 }}>
+                {translate("otherCountry")}
+              </Text>
+            </Pressable>
+          </View>
 
-          {/* Airtel Money */}
-          <Pressable
-            onPress={() => handlePaymentMethodSelect("airtel_money")}
-            style={({ pressed }) => [
-              styles.paymentOption,
-              { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
-            ]}
-          >
-            <View style={[styles.paymentIconBg, { backgroundColor: "#ED1C24" + "20" }]}>
-              <Text style={styles.paymentEmoji}>📱</Text>
-            </View>
-            <View style={styles.paymentInfo}>
-              <Text style={[styles.paymentName, { color: colors.foreground }]}>Airtel Money</Text>
-              <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("airtelMoneyDesc")}</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-          </Pressable>
+          {paymentCountry !== "other" ? (
+            <>
+              {/* MTN Mobile Money */}
+              <Pressable
+                onPress={() => handlePaymentMethodSelect("mtn_momo")}
+                style={({ pressed }) => [
+                  styles.paymentOption,
+                  { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
+                ]}
+              >
+                <View style={[styles.paymentIconBg, { backgroundColor: "#FFCC00" + "20" }]}>
+                  <Text style={styles.paymentEmoji}>📱</Text>
+                </View>
+                <View style={styles.paymentInfo}>
+                  <Text style={[styles.paymentName, { color: colors.foreground }]}>MTN Mobile Money</Text>
+                  <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("mtnMomoDesc")}</Text>
+                </View>
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              </Pressable>
 
-          {/* WhatsApp */}
-          <Pressable
-            onPress={() => handlePaymentMethodSelect("whatsapp")}
-            style={({ pressed }) => [
-              styles.paymentOption,
-              { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
-            ]}
-          >
-            <View style={[styles.paymentIconBg, { backgroundColor: "#25D366" + "20" }]}>
-              <IconSymbol name="message.fill" size={24} color="#25D366" />
-            </View>
-            <View style={styles.paymentInfo}>
-              <Text style={[styles.paymentName, { color: colors.foreground }]}>WhatsApp</Text>
-              <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("payWhatsAppDesc")}</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-          </Pressable>
+              {/* Airtel Money */}
+              <Pressable
+                onPress={() => handlePaymentMethodSelect("airtel_money")}
+                style={({ pressed }) => [
+                  styles.paymentOption,
+                  { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
+                ]}
+              >
+                <View style={[styles.paymentIconBg, { backgroundColor: "#ED1C24" + "20" }]}>
+                  <Text style={styles.paymentEmoji}>📱</Text>
+                </View>
+                <View style={styles.paymentInfo}>
+                  <Text style={[styles.paymentName, { color: colors.foreground }]}>Airtel Money</Text>
+                  <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("airtelMoneyDesc")}</Text>
+                </View>
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              </Pressable>
 
-          {/* Cash */}
-          <Pressable
-            onPress={() => handlePaymentMethodSelect("cash")}
-            style={({ pressed }) => [
-              styles.paymentOption,
-              { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
-            ]}
-          >
-            <View style={[styles.paymentIconBg, { backgroundColor: colors.success + "20" }]}>
-              <Text style={styles.paymentEmoji}>💵</Text>
-            </View>
-            <View style={styles.paymentInfo}>
-              <Text style={[styles.paymentName, { color: colors.foreground }]}>{translate("cashPayment")}</Text>
-              <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("cashPaymentShortDesc")}</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-          </Pressable>
+              {/* WhatsApp */}
+              <Pressable
+                onPress={() => handlePaymentMethodSelect("whatsapp")}
+                style={({ pressed }) => [
+                  styles.paymentOption,
+                  { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
+                ]}
+              >
+                <View style={[styles.paymentIconBg, { backgroundColor: "#25D366" + "20" }]}>
+                  <IconSymbol name="message.fill" size={24} color="#25D366" />
+                </View>
+                <View style={styles.paymentInfo}>
+                  <Text style={[styles.paymentName, { color: colors.foreground }]}>WhatsApp</Text>
+                  <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("payWhatsAppDesc")}</Text>
+                </View>
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              </Pressable>
 
-          {/* Call Directly */}
-          <Pressable
-            onPress={() => handlePaymentMethodSelect("call")}
-            style={({ pressed }) => [
-              styles.paymentOption,
-              { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
-            ]}
-          >
-            <View style={[styles.paymentIconBg, { backgroundColor: colors.primary + "20" }]}>
-              <IconSymbol name="phone.fill" size={24} color={colors.primary} />
-            </View>
-            <View style={styles.paymentInfo}>
-              <Text style={[styles.paymentName, { color: colors.foreground }]}>{translate("callDirectly")}</Text>
-              <Text style={[styles.paymentDesc, { color: colors.muted }]}>{WHATSAPP_NUMBER}</Text>
-            </View>
-            <IconSymbol name="chevron.right" size={18} color={colors.muted} />
-          </Pressable>
+              {/* Cash */}
+              <Pressable
+                onPress={() => handlePaymentMethodSelect("cash")}
+                style={({ pressed }) => [
+                  styles.paymentOption,
+                  { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
+                ]}
+              >
+                <View style={[styles.paymentIconBg, { backgroundColor: colors.success + "20" }]}>
+                  <Text style={styles.paymentEmoji}>💵</Text>
+                </View>
+                <View style={styles.paymentInfo}>
+                  <Text style={[styles.paymentName, { color: colors.foreground }]}>{translate("cashPayment")}</Text>
+                  <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("cashPaymentShortDesc")}</Text>
+                </View>
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              </Pressable>
+
+              {/* Call Directly */}
+              <Pressable
+                onPress={() => handlePaymentMethodSelect("call")}
+                style={({ pressed }) => [
+                  styles.paymentOption,
+                  { backgroundColor: pressed ? colors.surface : "transparent", borderColor: colors.border },
+                ]}
+              >
+                <View style={[styles.paymentIconBg, { backgroundColor: colors.primary + "20" }]}>
+                  <IconSymbol name="phone.fill" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.paymentInfo}>
+                  <Text style={[styles.paymentName, { color: colors.foreground }]}>{translate("callDirectly")}</Text>
+                  <Text style={[styles.paymentDesc, { color: colors.muted }]}>{WHATSAPP_NUMBER}</Text>
+                </View>
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+              </Pressable>
+            </>
+          ) : (
+            <>
+              {/* Other country — WhatsApp only */}
+              <View style={[styles.paymentOption, { borderColor: colors.border, backgroundColor: colors.surface + "50" }]}>
+                <View style={[styles.paymentIconBg, { backgroundColor: "#25D366" + "20" }]}>
+                  <IconSymbol name="message.fill" size={24} color="#25D366" />
+                </View>
+                <View style={[styles.paymentInfo, { flex: 1 }]}>
+                  <Text style={[styles.paymentName, { color: colors.foreground }]}>{translate("contactViaWhatsAppPayment")}</Text>
+                  <Text style={[styles.paymentDesc, { color: colors.muted }]}>{translate("whatsAppPaymentDesc")}</Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => {
+                  const msg = selectedPlan
+                    ? buildPaymentMessage(selectedPlan.name, selectedPlan.amountStr)
+                    : `Hello, I would like to subscribe to Business+. Please assist me with payment.`;
+                  const encoded = encodeURIComponent(msg);
+                  const url = `https://wa.me/${WHATSAPP_NUMBER.replace("+", "")}?text=${encoded}`;
+                  Linking.openURL(url).catch(() => {
+                    Alert.alert(translate("error"), "Could not open WhatsApp");
+                  });
+                  if (selectedPlan) submitPaymentRequest("whatsapp", "WhatsApp-International");
+                }}
+                style={({ pressed }) => [{
+                  flexDirection: "row", alignItems: "center", justifyContent: "center",
+                  backgroundColor: "#25D366", borderRadius: 12, paddingVertical: 14, marginTop: 8, gap: 8,
+                  opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.97 : 1 }],
+                }]}
+              >
+                <IconSymbol name="message.fill" size={20} color="#FFF" />
+                <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 15 }}>
+                  {translate("contactViaWhatsAppPayment")}
+                </Text>
+              </Pressable>
+            </>
+          )}
 
           <Pressable
             onPress={() => setPaymentModalVisible(false)}

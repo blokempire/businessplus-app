@@ -26,6 +26,8 @@ export interface Category {
 export interface UserProfile {
   name: string;
   businessName: string;
+  businessAddress: string;
+  businessPhone: string;
   currency: string;
   language: Language;
   logoUri: string; // local URI of company logo
@@ -144,6 +146,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
 export const DEFAULT_PROFILE: UserProfile = {
   name: "",
   businessName: "",
+  businessAddress: "",
+  businessPhone: "",
   currency: "XOF",
   language: "en",
   logoUri: "",

@@ -66,7 +66,7 @@ export default function LoginScreen() {
   const colors = useColors();
   const { translate, updateProfile, setLanguage } = useApp();
   const router = useRouter();
-  const { isAuthenticated, loading: authLoading, refresh } = useAuth();
+  const { isAuthenticated, loading: authLoading, refresh, setUserDirect } = useAuth();
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [countryCode, setCountryCode] = useState("+242"); // Default Congo
@@ -127,9 +127,10 @@ export default function LoginScreen() {
       const result = await loginMutation.mutateAsync({ phone: fullPhone, pin });
       // Store session
       await Auth.setSessionToken(result.sessionToken);
-      await Auth.setUserInfo(buildUserInfo(result));
-      // Navigate instantly — don't wait for AuthGate refresh cycle
-      router.replace("/(tabs)" as any);
+      const userInfo = buildUserInfo(result);
+      await Auth.setUserInfo(userInfo);
+      // Set user directly in state — AuthGate will handle navigation instantly
+      setUserDirect(userInfo);
     } catch (err: any) {
       const msg = err?.message || translate("loginError");
       Alert.alert(translate("error"), msg);
@@ -156,14 +157,15 @@ export default function LoginScreen() {
       });
       // Store session
       await Auth.setSessionToken(result.sessionToken);
-      await Auth.setUserInfo(buildUserInfo(result));
+      const userInfo = buildUserInfo(result);
+      await Auth.setUserInfo(userInfo);
       // Auto-detect currency and language from phone number
       const detectedCurrency = detectCurrencyFromPhone(fullPhone);
       const detectedLanguage = detectLanguageFromPhone(fullPhone);
       updateProfile({ currency: detectedCurrency });
       setLanguage(detectedLanguage);
-      // Navigate instantly — don't wait for AuthGate refresh cycle
-      router.replace("/(tabs)" as any);
+      // Set user directly in state — AuthGate will handle navigation instantly
+      setUserDirect(userInfo);
     } catch (err: any) {
       const msg = err?.message || translate("registerError");
       Alert.alert(translate("error"), msg);

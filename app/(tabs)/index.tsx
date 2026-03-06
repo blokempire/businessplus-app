@@ -1,13 +1,85 @@
-import { FlatList, Text, View, Pressable, StyleSheet, Image, Modal, ScrollView, TouchableOpacity } from "react-native";
+import { FlatList, Text, View, Pressable, StyleSheet, Image, Modal, ScrollView, TouchableOpacity, Animated as RNAnimated, PanResponder, Dimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { calculateTotals, formatCurrency, filterTransactionsByPeriod, Transaction } from "@/lib/store";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDebtReminders } from "@/hooks/use-debt-reminders";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+
+function SwipeableNotifItem({ item, colors, onDismiss }: {
+  item: { id: string; icon: string; iconColor: string; title: string; subtitle: string; type: string };
+  colors: any;
+  onDismiss: (id: string) => void;
+}) {
+  const translateX = useRef(new RNAnimated.Value(0)).current;
+  const itemHeight = useRef(new RNAnimated.Value(70)).current;
+  const opacity = useRef(new RNAnimated.Value(1)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx < 0) {
+          translateX.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -SWIPE_THRESHOLD) {
+          // Swipe away
+          RNAnimated.parallel([
+            RNAnimated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: false }),
+            RNAnimated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: false }),
+          ]).start(() => {
+            RNAnimated.timing(itemHeight, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => {
+              onDismiss(item.id);
+            });
+          });
+        } else {
+          // Snap back
+          RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: false, tension: 40, friction: 8 }).start();
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <RNAnimated.View
+      style={[{ height: itemHeight, opacity, overflow: "hidden", marginBottom: 10 }]}
+    >
+      {/* Red delete background */}
+      <View style={[notifStyles.notifItem, {
+        backgroundColor: colors.error,
+        position: "absolute", right: 0, top: 0, bottom: 0, left: 0,
+        justifyContent: "center", alignItems: "flex-end", paddingRight: 20,
+      }]}>
+        <IconSymbol name="trash.fill" size={22} color="#FFF" />
+      </View>
+      <RNAnimated.View
+        {...panResponder.panHandlers}
+        style={[notifStyles.notifItem, { backgroundColor: colors.surface, transform: [{ translateX }] }]}
+      >
+        <View style={[notifStyles.notifIcon, { backgroundColor: item.iconColor + "20" }]}>
+          <IconSymbol name={item.icon as any} size={20} color={item.iconColor} />
+        </View>
+        <View style={notifStyles.notifContent}>
+          <Text style={[notifStyles.notifTitle, { color: colors.foreground }]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={[notifStyles.notifSubtitle, { color: colors.muted }]} numberOfLines={2}>
+            {item.subtitle}
+          </Text>
+        </View>
+      </RNAnimated.View>
+    </RNAnimated.View>
+  );
+}
 
 export default function DashboardScreen() {
   const { state, translate } = useApp();
@@ -19,6 +91,15 @@ export default function DashboardScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [showNotifications, setShowNotifications] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+
+  const dismissNotification = useCallback((id: string) => {
+    setDismissedIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
 
   // Build notification items from pending invoices and debts
   const notificationItems = useMemo(() => {
@@ -53,6 +134,11 @@ export default function DashboardScreen() {
       });
     return items;
   }, [state.invoices, state.debtEntries, state.contacts, state.profile.currency, colors, translate]);
+
+  const visibleNotifications = useMemo(
+    () => notificationItems.filter(item => !dismissedIds.has(item.id)),
+    [notificationItems, dismissedIds]
+  );
 
   const allTotals = useMemo(() => calculateTotals(state.transactions), [state.transactions]);
   const todayTotals = useMemo(
@@ -353,7 +439,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* Notification List */}
-        {notificationItems.length === 0 ? (
+        {visibleNotifications.length === 0 ? (
           <View style={notifStyles.emptyState}>
             <IconSymbol name="bell.fill" size={48} color={colors.muted} />
             <Text style={[notifStyles.emptyText, { color: colors.muted }]}>
@@ -362,23 +448,13 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <ScrollView contentContainerStyle={notifStyles.list}>
-            {notificationItems.map((item) => (
-              <View
+            {visibleNotifications.map((item) => (
+              <SwipeableNotifItem
                 key={item.id}
-                style={[notifStyles.notifItem, { backgroundColor: colors.surface }]}
-              >
-                <View style={[notifStyles.notifIcon, { backgroundColor: item.iconColor + "20" }]}>
-                  <IconSymbol name={item.icon as any} size={20} color={item.iconColor} />
-                </View>
-                <View style={notifStyles.notifContent}>
-                  <Text style={[notifStyles.notifTitle, { color: colors.foreground }]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={[notifStyles.notifSubtitle, { color: colors.muted }]} numberOfLines={2}>
-                    {item.subtitle}
-                  </Text>
-                </View>
-              </View>
+                item={item}
+                colors={colors}
+                onDismiss={dismissNotification}
+              />
             ))}
           </ScrollView>
         )}

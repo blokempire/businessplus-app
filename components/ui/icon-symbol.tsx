@@ -82,6 +82,8 @@ const MAPPING = {
   "rectangle.portrait.and.arrow.right": "logout",
   "bell.fill": "notifications",
   "bell.badge.fill": "notifications-active",
+  "mappin": "place",
+  "globe.americas.fill": "public",
 } as IconMapping;
 
 export function IconSymbol({

@@ -75,16 +75,24 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, []);
 
+  /** Directly set user state — skips the async refresh cycle for instant transitions */
+  const setUserDirect = useCallback((newUser: Auth.User | null) => {
+    setUser(newUser);
+    setLoading(false);
+    setError(null);
+  }, []);
+
   const logout = useCallback(async () => {
+    // Clear state immediately for instant UI transition
+    setUser(null);
+    setError(null);
+    // Then clean up storage in background
     try {
-      await Api.logout();
-    } catch (err) {
-      console.error("[Auth] Logout API call failed:", err);
-    } finally {
       await Auth.removeSessionToken();
       await Auth.clearUserInfo();
-      setUser(null);
-      setError(null);
+      await Api.logout();
+    } catch (err) {
+      console.error("[Auth] Logout cleanup failed:", err);
     }
   }, []);
 
@@ -116,5 +124,6 @@ export function useAuth(options?: UseAuthOptions) {
     isAuthenticated,
     refresh: fetchUser,
     logout,
+    setUserDirect,
   };
 }
