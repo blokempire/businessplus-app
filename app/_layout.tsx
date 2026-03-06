@@ -9,6 +9,7 @@ import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AppProvider } from "@/lib/app-context";
+import { AuthProvider } from "@/lib/auth-context";
 import { AuthGate } from "@/components/auth-gate";
 import {
   SafeAreaFrameContext,
@@ -82,6 +83,7 @@ export default function RootLayout() {
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
       <AppProvider>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
@@ -110,6 +112,7 @@ export default function RootLayout() {
         </QueryClientProvider>
       </trpc.Provider>
       </AppProvider>
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 

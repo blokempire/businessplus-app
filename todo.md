@@ -155,3 +155,6 @@
 - [x] Feature: Notification swipe to dismiss
 - [x] Bug: Login/logout transition still not instant — try different approach (setUserDirect)
 - [ ] Feature: Shared workspace — invited members see principal account data when they accept invitation
+- [x] Bug: Login/logout transition STILL not instant — converted useAuth to shared AuthContext (all components share same state)
+- [x] Bug: Notification swipe-to-dismiss not working on device — replaced PanResponder with react-native-gesture-handler Swipeable
+- [x] Bug: Profile info and business logo updates not reflecting immediately — added useEffect sync + cache-busting key on Image + added businessAddress/Phone to pushToServer

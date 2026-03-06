@@ -1,4 +1,5 @@
-import { FlatList, Text, View, Pressable, StyleSheet, Image, Modal, ScrollView, TouchableOpacity, Animated as RNAnimated, PanResponder, Dimensions } from "react-native";
+import { FlatList, Text, View, Pressable, StyleSheet, Image, Modal, ScrollView, TouchableOpacity, Animated as RNAnimated } from "react-native";
+import Swipeable from "react-native-gesture-handler/Swipeable";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
@@ -9,62 +10,57 @@ import { useMemo, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDebtReminders } from "@/hooks/use-debt-reminders";
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
-
 function SwipeableNotifItem({ item, colors, onDismiss }: {
   item: { id: string; icon: string; iconColor: string; title: string; subtitle: string; type: string };
   colors: any;
   onDismiss: (id: string) => void;
 }) {
-  const translateX = useRef(new RNAnimated.Value(0)).current;
-  const itemHeight = useRef(new RNAnimated.Value(70)).current;
-  const opacity = useRef(new RNAnimated.Value(1)).current;
+  const swipeableRef = useRef<Swipeable>(null);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dx < 0) {
-          translateX.setValue(gestureState.dx);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -SWIPE_THRESHOLD) {
-          // Swipe away
-          RNAnimated.parallel([
-            RNAnimated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: false }),
-            RNAnimated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: false }),
-          ]).start(() => {
-            RNAnimated.timing(itemHeight, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => {
-              onDismiss(item.id);
-            });
-          });
-        } else {
-          // Snap back
-          RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: false, tension: 40, friction: 8 }).start();
-        }
-      },
-    })
-  ).current;
+  const renderRightActions = (_progress: RNAnimated.AnimatedInterpolation<number>, dragX: RNAnimated.AnimatedInterpolation<number>) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [1, 0.5],
+      extrapolate: "clamp",
+    });
+    return (
+      <Pressable
+        onPress={() => {
+          swipeableRef.current?.close();
+          onDismiss(item.id);
+        }}
+        style={({ pressed }) => [{
+          backgroundColor: colors.error,
+          justifyContent: "center",
+          alignItems: "center",
+          width: 80,
+          borderRadius: 14,
+          marginLeft: 8,
+          opacity: pressed ? 0.8 : 1,
+        }]}
+      >
+        <RNAnimated.View style={{ transform: [{ scale }] }}>
+          <IconSymbol name="trash.fill" size={22} color="#FFF" />
+          <Text style={{ color: "#FFF", fontSize: 11, fontWeight: "600", marginTop: 4 }}>Delete</Text>
+        </RNAnimated.View>
+      </Pressable>
+    );
+  };
 
   return (
-    <RNAnimated.View
-      style={[{ height: itemHeight, opacity, overflow: "hidden", marginBottom: 10 }]}
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      rightThreshold={40}
+      friction={2}
+      overshootRight={false}
+      onSwipeableOpen={(direction) => {
+        if (direction === "right") {
+          onDismiss(item.id);
+        }
+      }}
     >
-      {/* Red delete background */}
-      <View style={[notifStyles.notifItem, {
-        backgroundColor: colors.error,
-        position: "absolute", right: 0, top: 0, bottom: 0, left: 0,
-        justifyContent: "center", alignItems: "flex-end", paddingRight: 20,
-      }]}>
-        <IconSymbol name="trash.fill" size={22} color="#FFF" />
-      </View>
-      <RNAnimated.View
-        {...panResponder.panHandlers}
-        style={[notifStyles.notifItem, { backgroundColor: colors.surface, transform: [{ translateX }] }]}
-      >
+      <View style={[notifStyles.notifItem, { backgroundColor: colors.surface }]}>
         <View style={[notifStyles.notifIcon, { backgroundColor: item.iconColor + "20" }]}>
           <IconSymbol name={item.icon as any} size={20} color={item.iconColor} />
         </View>
@@ -76,8 +72,8 @@ function SwipeableNotifItem({ item, colors, onDismiss }: {
             {item.subtitle}
           </Text>
         </View>
-      </RNAnimated.View>
-    </RNAnimated.View>
+      </View>
+    </Swipeable>
   );
 }
 
@@ -228,7 +224,7 @@ export default function DashboardScreen() {
             {/* Header */}
             <View style={styles.header}>
               {state.profile.logoUri ? (
-                <Image source={{ uri: state.profile.logoUri }} style={styles.headerLogo} />
+                <Image key={state.profile.logoUri} source={{ uri: state.profile.logoUri }} style={styles.headerLogo} />
               ) : null}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.greeting, { color: colors.muted }]}>

@@ -220,6 +220,8 @@ async function pushToServer(state: AppState): Promise<void> {
         currency: state.profile.currency,
         language: state.profile.language,
         logoUri: state.profile.logoUri,
+        businessAddress: state.profile.businessAddress || "",
+        businessPhone: state.profile.businessPhone || "",
       },
       categories: state.categories.filter(c => c.isCustom).map(c => ({
         id: c.id, nameKey: c.nameKey, icon: c.icon, type: c.type, isCustom: c.isCustom,

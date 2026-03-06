@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Text,
   View,
@@ -27,7 +27,7 @@ export default function SettingsScreen() {
   const { state, updateProfile, setLanguage, addCategory, deleteCategory, translate } = useApp();
   const colors = useColors();
   const router = useRouter();
-  const { user, logout, isAuthenticated, setUserDirect } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -40,6 +40,20 @@ export default function SettingsScreen() {
   const [businessInput, setBusinessInput] = useState(state.profile.businessName);
   const [addressInput, setAddressInput] = useState(state.profile.businessAddress || "");
   const [phoneInput, setPhoneInput] = useState(state.profile.businessPhone || "");
+
+  // Keep local inputs in sync with context state when not actively editing
+  useEffect(() => {
+    if (!editingName) setNameInput(state.profile.name);
+  }, [state.profile.name, editingName]);
+  useEffect(() => {
+    if (!editingBusiness) setBusinessInput(state.profile.businessName);
+  }, [state.profile.businessName, editingBusiness]);
+  useEffect(() => {
+    if (!editingAddress) setAddressInput(state.profile.businessAddress || "");
+  }, [state.profile.businessAddress, editingAddress]);
+  useEffect(() => {
+    if (!editingPhone) setPhoneInput(state.profile.businessPhone || "");
+  }, [state.profile.businessPhone, editingPhone]);
 
   const handleExport = async () => {
     const headers = "Date,Type,Category,Amount,Description\n";
@@ -189,7 +203,7 @@ export default function SettingsScreen() {
           <View style={styles.logoRow}>
             {state.profile.logoUri ? (
               <Pressable onPress={handlePickLogo} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
-                <Image source={{ uri: state.profile.logoUri }} style={[styles.logoImage, { borderColor: colors.border }]} />
+                <Image key={state.profile.logoUri} source={{ uri: state.profile.logoUri }} style={[styles.logoImage, { borderColor: colors.border }]} />
               </Pressable>
             ) : (
               <Pressable
@@ -447,9 +461,7 @@ export default function SettingsScreen() {
                  text: translate("logout"),
                  style: "destructive",
                  onPress: () => {
-                   // Clear user state instantly — AuthGate will redirect to login
-                   setUserDirect(null);
-                   // Clean up session in background
+                   // logout() clears shared auth state instantly — AuthGate redirects to login
                    logout();
                  },
               },
