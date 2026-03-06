@@ -1,11 +1,11 @@
-import { FlatList, Text, View, Pressable, StyleSheet, Image } from "react-native";
+import { FlatList, Text, View, Pressable, StyleSheet, Image, Modal, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { calculateTotals, formatCurrency, filterTransactionsByPeriod, Transaction } from "@/lib/store";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDebtReminders } from "@/hooks/use-debt-reminders";
 
@@ -18,6 +18,41 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Build notification items from pending invoices and debts
+  const notificationItems = useMemo(() => {
+    const items: { id: string; icon: string; iconColor: string; title: string; subtitle: string; type: "invoice" | "debt" }[] = [];
+    // Pending/partial invoices
+    state.invoices
+      .filter((i) => i.status === "pending" || i.status === "partial")
+      .forEach((inv) => {
+        const remaining = inv.total - inv.paidAmount;
+        items.push({
+          id: `inv-${inv.id}`,
+          icon: "doc.text.fill",
+          iconColor: colors.warning,
+          title: inv.contactName,
+          subtitle: `${translate("unpaidInvoiceNotif")} • ${formatCurrency(remaining, state.profile.currency)}`,
+          type: "invoice",
+        });
+      });
+    // Debts (they owe me)
+    state.debtEntries
+      .filter((d) => d.type === "theyOweMe")
+      .forEach((debt) => {
+        const contact = state.contacts.find((c) => c.id === debt.contactId);
+        items.push({
+          id: `debt-${debt.id}`,
+          icon: "exclamationmark.triangle.fill",
+          iconColor: colors.error,
+          title: contact?.name || "Unknown",
+          subtitle: `${translate("debtOwedNotif")} ${formatCurrency(debt.amount, state.profile.currency)}`,
+          type: "debt",
+        });
+      });
+    return items;
+  }, [state.invoices, state.debtEntries, state.contacts, state.profile.currency, colors, translate]);
 
   const allTotals = useMemo(() => calculateTotals(state.transactions), [state.transactions]);
   const todayTotals = useMemo(
@@ -95,6 +130,7 @@ export default function DashboardScreen() {
   );
 
   return (
+    <>
     <ScreenContainer className="flex-1">
       <FlatList
         data={recentTransactions}
@@ -124,7 +160,7 @@ export default function DashboardScreen() {
                   <IconSymbol name="gearshape.fill" size={22} color={colors.muted} />
                 </Pressable>
                 <Pressable
-                  onPress={() => {}}
+                  onPress={() => setShowNotifications(true)}
                   style={({ pressed }) => [styles.headerIconBtn, { opacity: pressed ? 0.6 : 1 }]}
                 >
                   <View>
@@ -297,6 +333,58 @@ export default function DashboardScreen() {
         }
       />
     </ScreenContainer>
+
+    {/* Notification Panel Modal */}
+    <Modal
+      visible={showNotifications}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowNotifications(false)}
+    >
+      <View style={[notifStyles.container, { backgroundColor: colors.background }]}>
+        {/* Header */}
+        <View style={[notifStyles.header, { borderBottomColor: colors.border }]}>
+          <Text style={[notifStyles.headerTitle, { color: colors.foreground }]}>
+            {translate("notifications")}
+          </Text>
+          <TouchableOpacity onPress={() => setShowNotifications(false)} style={notifStyles.closeBtn}>
+            <IconSymbol name="xmark" size={20} color={colors.muted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Notification List */}
+        {notificationItems.length === 0 ? (
+          <View style={notifStyles.emptyState}>
+            <IconSymbol name="bell.fill" size={48} color={colors.muted} />
+            <Text style={[notifStyles.emptyText, { color: colors.muted }]}>
+              {translate("noNotifications")}
+            </Text>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={notifStyles.list}>
+            {notificationItems.map((item) => (
+              <View
+                key={item.id}
+                style={[notifStyles.notifItem, { backgroundColor: colors.surface }]}
+              >
+                <View style={[notifStyles.notifIcon, { backgroundColor: item.iconColor + "20" }]}>
+                  <IconSymbol name={item.icon as any} size={20} color={item.iconColor} />
+                </View>
+                <View style={notifStyles.notifContent}>
+                  <Text style={[notifStyles.notifTitle, { color: colors.foreground }]} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={[notifStyles.notifSubtitle, { color: colors.muted }]} numberOfLines={2}>
+                    {item.subtitle}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -521,5 +609,66 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "800",
+  },
+});
+
+const notifStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingTop: 16,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 0.5,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  closeBtn: {
+    padding: 8,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  list: {
+    padding: 20,
+    gap: 10,
+  },
+  notifItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 14,
+    gap: 12,
+  },
+  notifIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifContent: {
+    flex: 1,
+  },
+  notifTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  notifSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
   },
 });

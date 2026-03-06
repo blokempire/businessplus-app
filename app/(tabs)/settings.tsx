@@ -363,12 +363,13 @@ export default function SettingsScreen() {
             Alert.alert(translate("confirm"), translate("logoutConfirm"), [
               { text: translate("cancel"), style: "cancel" },
               {
-                text: translate("logout"),
-                style: "destructive",
-                onPress: async () => {
-                  await logout();
-                  router.replace("/login" as any);
-                },
+                 text: translate("logout"),
+                 style: "destructive",
+                 onPress: () => {
+                   // Navigate instantly, then clear session in background
+                   router.replace("/login" as any);
+                   logout();
+                 },
               },
             ]);
           }}

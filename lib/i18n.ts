@@ -463,6 +463,14 @@ export const translations = {
     expireAllConfirm: "This will expire all overdue subscriptions. Continue?",
     allExpired: "All overdue subscriptions expired",
 
+    // Notifications
+    notifications: "Notifications",
+    noNotifications: "No notifications",
+    unpaidInvoiceNotif: "has an unpaid invoice",
+    debtOwedNotif: "owes you",
+    viewAll: "View All",
+    close: "Close",
+
     // General
     today: "Today",
     yesterday: "Yesterday",
@@ -931,6 +939,14 @@ export const translations = {
     expireAll: "Expirer tous les retards",
     expireAllConfirm: "Cela expirera tous les abonnements en retard. Continuer ?",
     allExpired: "Tous les abonnements en retard expirés",
+
+    // Notifications
+    notifications: "Notifications",
+    noNotifications: "Aucune notification",
+    unpaidInvoiceNotif: "a une facture impayée",
+    debtOwedNotif: "vous doit",
+    viewAll: "Voir tout",
+    close: "Fermer",
 
     // General
     today: "Aujourd'hui",

@@ -144,3 +144,7 @@
 - [x] Feature: App startup — show local data instantly, sync server in background (non-blocking)
 - [x] UI: Balance card headers — labels now white, bold, uppercase with letter spacing for better contrast
 - [ ] Future: Business+ Network — user-to-user connections, send invoices, in-app payment confirmation
+- [x] Bug: Login to dashboard transition is not instant — fix auth flow delay
+- [x] Bug: Logout to login transition is not instant — fix auth flow delay
+- [x] Bug: Invoice quantity input disappears when typing manually
+- [x] Bug: Notification bell doesn't roll out to show notification details

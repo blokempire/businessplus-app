@@ -128,8 +128,8 @@ export default function LoginScreen() {
       // Store session
       await Auth.setSessionToken(result.sessionToken);
       await Auth.setUserInfo(buildUserInfo(result));
-      await refresh();
-      // AuthGate handles redirect to /(tabs) automatically
+      // Navigate instantly — don't wait for AuthGate refresh cycle
+      router.replace("/(tabs)" as any);
     } catch (err: any) {
       const msg = err?.message || translate("loginError");
       Alert.alert(translate("error"), msg);
@@ -162,8 +162,8 @@ export default function LoginScreen() {
       const detectedLanguage = detectLanguageFromPhone(fullPhone);
       updateProfile({ currency: detectedCurrency });
       setLanguage(detectedLanguage);
-      await refresh();
-      // AuthGate handles redirect to /(tabs) automatically
+      // Navigate instantly — don't wait for AuthGate refresh cycle
+      router.replace("/(tabs)" as any);
     } catch (err: any) {
       const msg = err?.message || translate("registerError");
       Alert.alert(translate("error"), msg);

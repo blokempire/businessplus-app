@@ -79,17 +79,18 @@ export default function CreateInvoiceScreen() {
   };
 
   const setItemQty = (productId: string, qty: number) => {
-    if (qty <= 0) {
-      setItems(items.filter((i) => i.productId !== productId));
-      return;
-    }
+    // Don't remove item when qty is 0 during typing — only remove via minus button
+    const safeQty = Math.max(qty, 1);
     setItems(
       items.map((i) => {
         if (i.productId !== productId) return i;
-        return { ...i, quantity: qty, total: qty * i.unitPrice };
+        return { ...i, quantity: safeQty, total: safeQty * i.unitPrice };
       })
     );
   };
+
+  // Track which item is being edited and its text value
+  const [editingQty, setEditingQty] = useState<{ productId: string; text: string } | null>(null);
 
   const handleCreate = () => {
     if (!selectedContact) {
@@ -272,10 +273,25 @@ export default function CreateInvoiceScreen() {
                   </TouchableOpacity>
                   <TextInput
                      style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, minWidth: 36, textAlign: "center", paddingVertical: 2, paddingHorizontal: 4, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}
-                     value={String(item.quantity)}
+                     value={editingQty?.productId === item.productId ? editingQty.text : String(item.quantity)}
+                     onFocus={() => setEditingQty({ productId: item.productId, text: String(item.quantity) })}
                      onChangeText={(text) => {
-                       const num = parseInt(text.replace(/[^0-9]/g, ""), 10);
-                       if (!isNaN(num)) setItemQty(item.productId, num);
+                       const cleaned = text.replace(/[^0-9]/g, "");
+                       setEditingQty({ productId: item.productId, text: cleaned });
+                     }}
+                     onBlur={() => {
+                       if (editingQty && editingQty.productId === item.productId) {
+                         const num = parseInt(editingQty.text, 10);
+                         setItemQty(item.productId, isNaN(num) || num <= 0 ? 1 : num);
+                         setEditingQty(null);
+                       }
+                     }}
+                     onSubmitEditing={() => {
+                       if (editingQty && editingQty.productId === item.productId) {
+                         const num = parseInt(editingQty.text, 10);
+                         setItemQty(item.productId, isNaN(num) || num <= 0 ? 1 : num);
+                         setEditingQty(null);
+                       }
                      }}
                      keyboardType="number-pad"
                      returnKeyType="done"
