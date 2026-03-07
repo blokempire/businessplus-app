@@ -162,3 +162,5 @@
 - [x] Feature: Show pending team invitations in notification panel with Accept/Reject
 - [x] Feature: WhatsApp invitation message auto-opens when inviting a team member
 - [x] Feature: Tapping a notification navigates to the relevant screen (invoice, contact, company)
+- [x] Feature: Viewed (tapped) notifications disappear permanently — persisted with AsyncStorage
+- [x] Feature: Dismissed (X) notifications hide for 2 days, reappear if unresolved — persisted with timestamp

@@ -5,10 +5,15 @@ import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { calculateTotals, formatCurrency, filterTransactionsByPeriod, Transaction } from "@/lib/store";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDebtReminders } from "@/hooks/use-debt-reminders";
 import { trpc } from "@/lib/trpc";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const VIEWED_KEY = "@notif_viewed";
+const DISMISSED_KEY = "@notif_dismissed";
+const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
 // Notification item types
 type NotifItemData = {
@@ -32,7 +37,34 @@ export default function DashboardScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [showNotifications, setShowNotifications] = useState(false);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
+  const [dismissedMap, setDismissedMap] = useState<Record<string, number>>({}); // id -> timestamp when dismissed
+  const loadedRef = useRef(false);
+
+  // Load persisted viewed/dismissed data on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const [viewedJson, dismissedJson] = await Promise.all([
+          AsyncStorage.getItem(VIEWED_KEY),
+          AsyncStorage.getItem(DISMISSED_KEY),
+        ]);
+        if (viewedJson) setViewedIds(new Set(JSON.parse(viewedJson)));
+        if (dismissedJson) setDismissedMap(JSON.parse(dismissedJson));
+      } catch {}
+      loadedRef.current = true;
+    })();
+  }, []);
+
+  // Persist viewed IDs
+  const persistViewed = useCallback(async (ids: Set<string>) => {
+    try { await AsyncStorage.setItem(VIEWED_KEY, JSON.stringify([...ids])); } catch {}
+  }, []);
+
+  // Persist dismissed map
+  const persistDismissed = useCallback(async (map: Record<string, number>) => {
+    try { await AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify(map)); } catch {}
+  }, []);
 
   // Fetch pending team invitations from server
   const pendingInvitationsQuery = trpc.company.pendingInvitations.useQuery(undefined, { retry: false });
@@ -53,13 +85,24 @@ export default function DashboardScreen() {
     onError: (err: any) => Alert.alert(translate("error"), err.message),
   });
 
-  const dismissNotification = useCallback((id: string) => {
-    setDismissedIds(prev => {
+  // Mark as viewed (permanent) — called when user taps a notification
+  const markAsViewed = useCallback((id: string) => {
+    setViewedIds(prev => {
       const next = new Set(prev);
       next.add(id);
+      persistViewed(next);
       return next;
     });
-  }, []);
+  }, [persistViewed]);
+
+  // Dismiss notification (hidden for 2 days) — called when user taps X
+  const dismissNotification = useCallback((id: string) => {
+    setDismissedMap(prev => {
+      const next = { ...prev, [id]: Date.now() };
+      persistDismissed(next);
+      return next;
+    });
+  }, [persistDismissed]);
 
   // Build notification items from pending invoices, debts, and team invitations
   const notificationItems = useMemo(() => {
@@ -109,12 +152,21 @@ export default function DashboardScreen() {
     return items;
   }, [state.invoices, state.debtEntries, state.contacts, state.profile.currency, colors, translate, pendingInvitations]);
 
-  const visibleNotifications = useMemo(
-    () => notificationItems.filter(item => !dismissedIds.has(item.id)),
-    [notificationItems, dismissedIds]
-  );
+  const visibleNotifications = useMemo(() => {
+    const now = Date.now();
+    return notificationItems.filter(item => {
+      // Permanently viewed — never show again
+      if (viewedIds.has(item.id)) return false;
+      // Dismissed — hide for 2 days
+      const dismissedAt = dismissedMap[item.id];
+      if (dismissedAt && (now - dismissedAt) < TWO_DAYS_MS) return false;
+      return true;
+    });
+  }, [notificationItems, viewedIds, dismissedMap]);
 
   const handleNotifTap = useCallback((item: NotifItemData) => {
+    // Mark as viewed — permanently removes from notifications
+    markAsViewed(item.id);
     setShowNotifications(false);
     if (item.type === "invoice" && item.referenceId) {
       router.push({ pathname: "/invoice-detail", params: { invoiceId: item.referenceId } } as any);
@@ -123,7 +175,7 @@ export default function DashboardScreen() {
     } else if (item.type === "invitation") {
       router.push("/company" as any);
     }
-  }, [router]);
+  }, [router, markAsViewed]);
 
   const handleAcceptInvitation = useCallback((invitationId: number) => {
     acceptMutation.mutate({ invitationId });
