@@ -2,6 +2,9 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -67,6 +70,28 @@ async function startServer() {
       createContext,
     }),
   );
+
+  // Serve static web build files in production
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const webBuildPath = path.resolve(__dirname, "../web-build");
+  if (fs.existsSync(webBuildPath)) {
+    app.use(express.static(webBuildPath));
+    // For client-side routing: serve index.html for any non-API route
+    app.get("*", (req, res) => {
+      if (!req.path.startsWith("/api")) {
+        const htmlFile = path.join(webBuildPath, req.path + ".html");
+        const indexFile = path.join(webBuildPath, req.path, "index.html");
+        if (fs.existsSync(htmlFile)) {
+          res.sendFile(htmlFile);
+        } else if (fs.existsSync(indexFile)) {
+          res.sendFile(indexFile);
+        } else {
+          res.sendFile(path.join(webBuildPath, "index.html"));
+        }
+      }
+    });
+  }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);

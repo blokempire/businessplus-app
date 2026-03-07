@@ -128,7 +128,7 @@
 - [x] Feature: Duplicate payment prevention (block if pending request exists for same plan)
 - [x] Feature: i18n translations for all payment features (EN + FR)
 - [x] Feature: Sync all business data to server database (transactions, contacts, stock, invoices) — server sync with local fallback
-- [ ] Bug: Published web app shows "Not Found" on ledgerapp-4avc6trn.manus.space
+- [x] Bug: Published web app shows "Not Found" on ledgerapp-4avc6trn.manus.space — production server now serves Expo web build
 - [x] Feature: Build landing page for businessplus24.com with app branding and download links
 - [x] Bug: Fix auth page to dashboard transition animation/bug (removed duplicate navigation, let AuthGate handle it)
 - [x] Bug: Fix admin panel access (user: +242 056184503, pin: 8121) — updated admin phone check and set role in DB
