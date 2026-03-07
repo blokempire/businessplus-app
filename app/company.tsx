@@ -61,10 +61,26 @@ export default function CompanyScreen() {
 
   const inviteMutation = trpc.company.invite.useMutation({
     onSuccess: () => {
-      Alert.alert(translate("success"), translate("invitationSent"));
+      const rawPhone = invitePhone.replace(/\s+/g, "").replace(/^0+/, "");
+      const fullPhone = `${countryCode}${rawPhone}`.replace("+", "");
+      const message = encodeURIComponent(translate("whatsappInviteMsg"));
+      const whatsappUrl = `https://wa.me/${fullPhone}?text=${message}`;
       setShowInviteModal(false);
       setInvitePhone("");
       utils.company.info.invalidate();
+      utils.company.pendingInvitations.invalidate();
+      // Ask user if they want to send WhatsApp invite
+      Alert.alert(
+        translate("success"),
+        translate("invitationSent"),
+        [
+          { text: "OK", style: "cancel" },
+          {
+            text: translate("sendWhatsappInvite"),
+            onPress: () => Linking.openURL(whatsappUrl),
+          },
+        ]
+      );
     },
     onError: (err: any) => {
       Alert.alert(translate("error"), err.message);

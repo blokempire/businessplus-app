@@ -1,81 +1,26 @@
-import { FlatList, Text, View, Pressable, StyleSheet, Image, Modal, ScrollView, TouchableOpacity, Animated as RNAnimated } from "react-native";
-import Swipeable from "react-native-gesture-handler/Swipeable";
+import { FlatList, Text, View, Pressable, StyleSheet, Image, Modal, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { calculateTotals, formatCurrency, filterTransactionsByPeriod, Transaction } from "@/lib/store";
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDebtReminders } from "@/hooks/use-debt-reminders";
+import { trpc } from "@/lib/trpc";
 
-function SwipeableNotifItem({ item, colors, onDismiss }: {
-  item: { id: string; icon: string; iconColor: string; title: string; subtitle: string; type: string };
-  colors: any;
-  onDismiss: (id: string) => void;
-}) {
-  const swipeableRef = useRef<Swipeable>(null);
-
-  const renderRightActions = (_progress: RNAnimated.AnimatedInterpolation<number>, dragX: RNAnimated.AnimatedInterpolation<number>) => {
-    const scale = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [1, 0.5],
-      extrapolate: "clamp",
-    });
-    return (
-      <Pressable
-        onPress={() => {
-          swipeableRef.current?.close();
-          onDismiss(item.id);
-        }}
-        style={({ pressed }) => [{
-          backgroundColor: colors.error,
-          justifyContent: "center",
-          alignItems: "center",
-          width: 80,
-          borderRadius: 14,
-          marginLeft: 8,
-          opacity: pressed ? 0.8 : 1,
-        }]}
-      >
-        <RNAnimated.View style={{ transform: [{ scale }] }}>
-          <IconSymbol name="trash.fill" size={22} color="#FFF" />
-          <Text style={{ color: "#FFF", fontSize: 11, fontWeight: "600", marginTop: 4 }}>Delete</Text>
-        </RNAnimated.View>
-      </Pressable>
-    );
-  };
-
-  return (
-    <Swipeable
-      ref={swipeableRef}
-      renderRightActions={renderRightActions}
-      rightThreshold={40}
-      friction={2}
-      overshootRight={false}
-      onSwipeableOpen={(direction) => {
-        if (direction === "right") {
-          onDismiss(item.id);
-        }
-      }}
-    >
-      <View style={[notifStyles.notifItem, { backgroundColor: colors.surface }]}>
-        <View style={[notifStyles.notifIcon, { backgroundColor: item.iconColor + "20" }]}>
-          <IconSymbol name={item.icon as any} size={20} color={item.iconColor} />
-        </View>
-        <View style={notifStyles.notifContent}>
-          <Text style={[notifStyles.notifTitle, { color: colors.foreground }]} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={[notifStyles.notifSubtitle, { color: colors.muted }]} numberOfLines={2}>
-            {item.subtitle}
-          </Text>
-        </View>
-      </View>
-    </Swipeable>
-  );
-}
+// Notification item types
+type NotifItemData = {
+  id: string;
+  icon: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  type: "invoice" | "debt" | "invitation";
+  referenceId?: string;
+  invitationId?: number;
+};
 
 export default function DashboardScreen() {
   const { state, translate } = useApp();
@@ -89,6 +34,25 @@ export default function DashboardScreen() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
+  // Fetch pending team invitations from server
+  const pendingInvitationsQuery = trpc.company.pendingInvitations.useQuery(undefined, { retry: false });
+  const pendingInvitations = pendingInvitationsQuery.data || [];
+  const utils = trpc.useUtils();
+
+  const acceptMutation = trpc.company.acceptInvitation.useMutation({
+    onSuccess: () => {
+      Alert.alert(translate("success"), translate("invitationAccepted"));
+      utils.company.pendingInvitations.invalidate();
+      utils.company.info.invalidate();
+    },
+    onError: (err: any) => Alert.alert(translate("error"), err.message),
+  });
+
+  const rejectMutation = trpc.company.rejectInvitation.useMutation({
+    onSuccess: () => utils.company.pendingInvitations.invalidate(),
+    onError: (err: any) => Alert.alert(translate("error"), err.message),
+  });
+
   const dismissNotification = useCallback((id: string) => {
     setDismissedIds(prev => {
       const next = new Set(prev);
@@ -97,9 +61,21 @@ export default function DashboardScreen() {
     });
   }, []);
 
-  // Build notification items from pending invoices and debts
+  // Build notification items from pending invoices, debts, and team invitations
   const notificationItems = useMemo(() => {
-    const items: { id: string; icon: string; iconColor: string; title: string; subtitle: string; type: "invoice" | "debt" }[] = [];
+    const items: NotifItemData[] = [];
+    // Team invitations (highest priority)
+    pendingInvitations.forEach((inv: any) => {
+      items.push({
+        id: `invite-${inv.id}`,
+        icon: "person.2.fill",
+        iconColor: colors.primary,
+        title: translate("companyGroup"),
+        subtitle: translate("teamInvitationNotif"),
+        type: "invitation",
+        invitationId: inv.id,
+      });
+    });
     // Pending/partial invoices
     state.invoices
       .filter((i) => i.status === "pending" || i.status === "partial")
@@ -112,6 +88,7 @@ export default function DashboardScreen() {
           title: inv.contactName,
           subtitle: `${translate("unpaidInvoiceNotif")} • ${formatCurrency(remaining, state.profile.currency)}`,
           type: "invoice",
+          referenceId: inv.id,
         });
       });
     // Debts (they owe me)
@@ -126,15 +103,36 @@ export default function DashboardScreen() {
           title: contact?.name || "Unknown",
           subtitle: `${translate("debtOwedNotif")} ${formatCurrency(debt.amount, state.profile.currency)}`,
           type: "debt",
+          referenceId: debt.contactId,
         });
       });
     return items;
-  }, [state.invoices, state.debtEntries, state.contacts, state.profile.currency, colors, translate]);
+  }, [state.invoices, state.debtEntries, state.contacts, state.profile.currency, colors, translate, pendingInvitations]);
 
   const visibleNotifications = useMemo(
     () => notificationItems.filter(item => !dismissedIds.has(item.id)),
     [notificationItems, dismissedIds]
   );
+
+  const handleNotifTap = useCallback((item: NotifItemData) => {
+    setShowNotifications(false);
+    if (item.type === "invoice" && item.referenceId) {
+      router.push({ pathname: "/invoice-detail", params: { invoiceId: item.referenceId } } as any);
+    } else if (item.type === "debt" && item.referenceId) {
+      router.push({ pathname: "/contact-detail", params: { contactId: item.referenceId } } as any);
+    } else if (item.type === "invitation") {
+      router.push("/company" as any);
+    }
+  }, [router]);
+
+  const handleAcceptInvitation = useCallback((invitationId: number) => {
+    acceptMutation.mutate({ invitationId });
+  }, [acceptMutation]);
+
+  const handleRejectInvitation = useCallback((invitationId: number, notifId: string) => {
+    rejectMutation.mutate({ invitationId });
+    dismissNotification(notifId);
+  }, [rejectMutation, dismissNotification]);
 
   const allTotals = useMemo(() => calculateTotals(state.transactions), [state.transactions]);
   const todayTotals = useMemo(
@@ -247,10 +245,10 @@ export default function DashboardScreen() {
                 >
                   <View>
                     <IconSymbol name="bell.fill" size={22} color={colors.muted} />
-                    {(state.debtEntries.length + state.invoices.filter(i => i.status === "pending" || i.status === "partial").length) > 0 && (
+                    {visibleNotifications.length > 0 && (
                       <View style={[styles.notifBadge, { backgroundColor: colors.error }]}>
                         <Text style={styles.notifBadgeText}>
-                          {Math.min(state.debtEntries.length + state.invoices.filter(i => i.status === "pending" || i.status === "partial").length, 99)}
+                          {Math.min(visibleNotifications.length, 99)}
                         </Text>
                       </View>
                     )}
@@ -445,12 +443,52 @@ export default function DashboardScreen() {
         ) : (
           <ScrollView contentContainerStyle={notifStyles.list}>
             {visibleNotifications.map((item) => (
-              <SwipeableNotifItem
-                key={item.id}
-                item={item}
-                colors={colors}
-                onDismiss={dismissNotification}
-              />
+              <View key={item.id} style={notifStyles.notifRow}>
+                <Pressable
+                  onPress={() => handleNotifTap(item)}
+                  style={({ pressed }) => [notifStyles.notifItem, { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <View style={[notifStyles.notifIcon, { backgroundColor: item.iconColor + "20" }]}>
+                    <IconSymbol name={item.icon as any} size={20} color={item.iconColor} />
+                  </View>
+                  <View style={notifStyles.notifContent}>
+                    <Text style={[notifStyles.notifTitle, { color: colors.foreground }]} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={[notifStyles.notifSubtitle, { color: colors.muted }]} numberOfLines={2}>
+                      {item.subtitle}
+                    </Text>
+                    <Text style={[notifStyles.notifTapHint, { color: colors.primary }]}>
+                      {translate("tapToView")}
+                    </Text>
+                  </View>
+                  {/* Invitation: Accept/Reject buttons */}
+                  {item.type === "invitation" && item.invitationId ? (
+                    <View style={notifStyles.invitationActions}>
+                      <Pressable
+                        onPress={() => handleAcceptInvitation(item.invitationId!)}
+                        style={({ pressed }) => [notifStyles.invBtn, { backgroundColor: colors.success, opacity: pressed ? 0.8 : 1 }]}
+                      >
+                        <IconSymbol name="checkmark" size={16} color="#FFF" />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleRejectInvitation(item.invitationId!, item.id)}
+                        style={({ pressed }) => [notifStyles.invBtn, { backgroundColor: colors.error, opacity: pressed ? 0.8 : 1 }]}
+                      >
+                        <IconSymbol name="xmark" size={16} color="#FFF" />
+                      </Pressable>
+                    </View>
+                  ) : (
+                    /* Dismiss button for invoices/debts */
+                    <Pressable
+                      onPress={() => dismissNotification(item.id)}
+                      style={({ pressed }) => [notifStyles.dismissBtn, { opacity: pressed ? 0.5 : 0.8 }]}
+                    >
+                      <IconSymbol name="xmark" size={16} color={colors.muted} />
+                    </Pressable>
+                  )}
+                </Pressable>
+              </View>
             ))}
           </ScrollView>
         )}
@@ -742,5 +780,29 @@ const notifStyles = StyleSheet.create({
   notifSubtitle: {
     fontSize: 13,
     marginTop: 2,
+  },
+  notifTapHint: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: 4,
+  },
+  notifRow: {
+    marginBottom: 0,
+  },
+  invitationActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginLeft: 8,
+  },
+  invBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dismissBtn: {
+    padding: 8,
+    marginLeft: 4,
   },
 });

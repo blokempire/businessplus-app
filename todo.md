@@ -158,3 +158,7 @@
 - [x] Bug: Login/logout transition STILL not instant — converted useAuth to shared AuthContext (all components share same state)
 - [x] Bug: Notification swipe-to-dismiss not working on device — replaced PanResponder with react-native-gesture-handler Swipeable
 - [x] Bug: Profile info and business logo updates not reflecting immediately — added useEffect sync + cache-busting key on Image + added businessAddress/Phone to pushToServer
+- [x] Bug: Notification swipe STILL not working — replaced with dismiss X button (no gesture conflicts)
+- [x] Feature: Show pending team invitations in notification panel with Accept/Reject
+- [x] Feature: WhatsApp invitation message auto-opens when inviting a team member
+- [x] Feature: Tapping a notification navigates to the relevant screen (invoice, contact, company)
