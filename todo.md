@@ -164,3 +164,5 @@
 - [x] Feature: Tapping a notification navigates to the relevant screen (invoice, contact, company)
 - [x] Feature: Viewed (tapped) notifications disappear permanently — persisted with AsyncStorage
 - [x] Feature: Dismissed (X) notifications hide for 2 days, reappear if unresolved — persisted with timestamp
+- [ ] Deploy web app to external hosting service (Render.com) for permanent public access
+- [x] Fix iOS App Store build failure - EAS CLI version mismatch error (lowered eas.json CLI version to >= 12.0.0)
