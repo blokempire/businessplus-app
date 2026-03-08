@@ -16,6 +16,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "memodouc5@yahoo.com",
+        "ascAppId": "REPLACE_WITH_APP_ID"
+      }
+    }
   }
 }
